@@ -1,0 +1,25 @@
+# 認証情報（DPAPI暗号化済みだが念のため除外）
+.credentials
+
+# PyInstaller ビルド成果物
+build/
+dist/
+*.spec
+
+# Python キャッシュ
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ZIP 配布物
+*.zip
+
+# ユーザー固有の設定（各自で管理）
+config.yaml
+
+# エディタ・OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
