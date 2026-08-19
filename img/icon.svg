@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <!-- 背景グラデーション -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#0078D4"/>
+      <stop offset="100%" stop-color="#004C8C"/>
+    </linearGradient>
+    <!-- 稲妻グラデーション -->
+    <linearGradient id="boltGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#C8E4FF"/>
+    </linearGradient>
+    <!-- ドロップシャドウ -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+    <!-- 内側グロー -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- 背景: 角丸正方形 -->
+  <rect width="256" height="256" rx="52" ry="52" fill="url(#bgGrad)"/>
+
+  <!-- 背景のサブトルな光沢 -->
+  <ellipse cx="128" cy="60" rx="100" ry="50" fill="white" opacity="0.06"/>
+
+  <!-- ── サーバーラック（左） ── -->
+  <g filter="url(#shadow)">
+    <!-- ラック本体 -->
+    <rect x="28" y="68" width="80" height="122" rx="6" fill="#FFFFFF" opacity="0.15"/>
+    <rect x="28" y="68" width="80" height="122" rx="6" fill="none" stroke="#FFFFFF" stroke-width="2" opacity="0.5"/>
+
+    <!-- サーバーユニット 1 -->
+    <rect x="36" y="80" width="64" height="18" rx="3" fill="#FFFFFF" opacity="0.25"/>
+    <circle cx="89" cy="89" r="3.5" fill="#4EFF91"/>
+    <rect x="40" y="86" width="32" height="4" rx="2" fill="#FFFFFF" opacity="0.4"/>
+    <rect x="40" y="92" width="20" height="3" rx="1.5" fill="#FFFFFF" opacity="0.25"/>
+
+    <!-- サーバーユニット 2 -->
+    <rect x="36" y="104" width="64" height="18" rx="3" fill="#FFFFFF" opacity="0.25"/>
+    <circle cx="89" cy="113" r="3.5" fill="#4EFF91"/>
+    <rect x="40" y="110" width="32" height="4" rx="2" fill="#FFFFFF" opacity="0.4"/>
+    <rect x="40" y="116" width="20" height="3" rx="1.5" fill="#FFFFFF" opacity="0.25"/>
+
+    <!-- サーバーユニット 3 -->
+    <rect x="36" y="128" width="64" height="18" rx="3" fill="#FFFFFF" opacity="0.2"/>
+    <circle cx="89" cy="137" r="3.5" fill="#FFB84E"/>
+    <rect x="40" y="134" width="32" height="4" rx="2" fill="#FFFFFF" opacity="0.35"/>
+    <rect x="40" y="140" width="20" height="3" rx="1.5" fill="#FFFFFF" opacity="0.2"/>
+
+    <!-- サーバーユニット 4 -->
+    <rect x="36" y="152" width="64" height="18" rx="3" fill="#FFFFFF" opacity="0.15"/>
+    <circle cx="89" cy="161" r="3.5" fill="#FFFFFF" opacity="0.4"/>
+    <rect x="40" y="158" width="32" height="4" rx="2" fill="#FFFFFF" opacity="0.25"/>
+    <rect x="40" y="164" width="20" height="3" rx="1.5" fill="#FFFFFF" opacity="0.15"/>
+  </g>
+
+  <!-- ── 稲妻（中央） ── -->
+  <g filter="url(#glow)">
+    <polygon
+      points="136,58  112,128  130,128  120,198  156,118  136,118  152,58"
+      fill="url(#boltGrad)"
+      opacity="0.95"
+    />
+  </g>
+
+  <!-- 稲妻の輪郭 -->
+  <polygon
+    points="136,58  112,128  130,128  120,198  156,118  136,118  152,58"
+    fill="none"
+    stroke="white"
+    stroke-width="1.5"
+    opacity="0.3"
+  />
+
+  <!-- ── 端末（右） ── -->
+  <g filter="url(#shadow)">
+    <!-- モニター本体 -->
+    <rect x="150" y="78" width="78" height="56" rx="6" fill="#FFFFFF" opacity="0.15"/>
+    <rect x="150" y="78" width="78" height="56" rx="6" fill="none" stroke="#FFFFFF" stroke-width="2" opacity="0.5"/>
+    <!-- 画面 -->
+    <rect x="157" y="85" width="64" height="42" rx="3" fill="#001A33" opacity="0.7"/>
+    <!-- プロンプト -->
+    <text x="163" y="100" font-family="monospace" font-size="9" fill="#4EFF91" opacity="0.9">$ ssh admin@</text>
+    <text x="163" y="112" font-family="monospace" font-size="9" fill="#4EFF91" opacity="0.9">192.168.1.10</text>
+    <text x="163" y="122" font-family="monospace" font-size="8" fill="#FFFFFF" opacity="0.5">connected ✓</text>
+    <!-- スタンド -->
+    <rect x="183" y="134" width="12" height="10" rx="2" fill="#FFFFFF" opacity="0.25"/>
+    <rect x="174" y="144" width="30" height="5" rx="2.5" fill="#FFFFFF" opacity="0.2"/>
+
+    <!-- キーボード -->
+    <rect x="152" y="158" width="74" height="32" rx="5" fill="#FFFFFF" opacity="0.12"/>
+    <rect x="152" y="158" width="74" height="32" rx="5" fill="none" stroke="#FFFFFF" stroke-width="1.5" opacity="0.4"/>
+    <!-- キー列 -->
+    <rect x="158" y="164" width="8"  height="5" rx="1.5" fill="#FFFFFF" opacity="0.35"/>
+    <rect x="169" y="164" width="8"  height="5" rx="1.5" fill="#FFFFFF" opacity="0.35"/>
+    <rect x="180" y="164" width="8"  height="5" rx="1.5" fill="#FFFFFF" opacity="0.35"/>
+    <rect x="191" y="164" width="8"  height="5" rx="1.5" fill="#FFFFFF" opacity="0.35"/>
+    <rect x="202" y="164" width="8"  height="5" rx="1.5" fill="#FFFFFF" opacity="0.35"/>
+    <rect x="158" y="173" width="8"  height="5" rx="1.5" fill="#FFFFFF" opacity="0.3"/>
+    <rect x="169" y="173" width="8"  height="5" rx="1.5" fill="#FFFFFF" opacity="0.3"/>
+    <rect x="180" y="173" width="22" height="5" rx="1.5" fill="#FFFFFF" opacity="0.3"/>
+    <rect x="205" y="173" width="5"  height="5" rx="1.5" fill="#FFFFFF" opacity="0.3"/>
+    <!-- スペースバー -->
+    <rect x="165" y="181" width="48" height="5" rx="2.5" fill="#FFFFFF" opacity="0.25"/>
+  </g>
+
+  <!-- 右下: バージョンドット装飾 -->
+  <circle cx="220" cy="220" r="4" fill="#FFFFFF" opacity="0.2"/>
+  <circle cx="232" cy="220" r="4" fill="#FFFFFF" opacity="0.2"/>
+  <circle cx="226" cy="230" r="4" fill="#FFFFFF" opacity="0.2"/>
+</svg>
