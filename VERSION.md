@@ -2,10 +2,14 @@
 
 ## Current
 
-version: 1.6.0
+version: 1.6.1
 date: 2026-08-19
 
 ## Changelog
+
+### 1.6.1 (2026-08-19)
+- svg2ico.py を Inkscape 優先方式に変更（cairosvg の Cairo DLL 不足エラーを修正）
+- build.yml の pip install から cairosvg を削除し pillow のみに変更
 
 ### 1.6.0 (2026-08-19)
 - フォルダ構成を整理
