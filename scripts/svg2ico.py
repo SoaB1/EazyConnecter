@@ -1,17 +1,21 @@
+# -*- coding: utf-8 -*-
 """
-icon.svg を icon.ico に変換するスクリプト（ビルド用）
+Convert img/icon.svg to icon.ico for build process.
 
-変換方法（優先順）:
-  1. Inkscape CLI  -- GitHub Actions Windows ランナーにプリインストール済み
-  2. cairosvg      -- Cairo DLL が必要（ローカル環境向け）
-  3. 変換スキップ  -- どちらもない場合
+Priority:
+  1. Inkscape CLI  (pre-installed on GitHub Actions windows-latest)
+  2. cairosvg      (requires Cairo DLL, for local environments)
+  3. Skip          (if neither is available)
 """
 import io
 import os
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
+
+# Force UTF-8 output to avoid encoding errors in CI environments
+if sys.stdout.encoding != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
 
 SVG_PATH = "img/icon.svg"
 ICO_PATH = "icon.ico"
@@ -20,20 +24,19 @@ SIZES    = [16, 32, 48, 64, 128, 256]
 INKSCAPE_CANDIDATES = [
     r"C:\Program Files\Inkscape\bin\inkscape.exe",
     r"C:\Program Files (x86)\Inkscape\bin\inkscape.exe",
-    "inkscape",   # PATH が通っている場合
+    "inkscape",
 ]
 
 
-def svg_to_png_inkscape(svg: str, size: int) -> bytes:
+def svg_to_png_inkscape(svg, size):
     inkscape = next(
         (p for p in INKSCAPE_CANDIDATES
          if p == "inkscape" or os.path.exists(p)), None)
     if inkscape is None:
-        raise FileNotFoundError("Inkscape が見つかりません")
+        raise FileNotFoundError("Inkscape not found")
 
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
         tmp_path = tmp.name
-
     try:
         subprocess.run(
             [inkscape, "--export-type=png",
@@ -49,7 +52,7 @@ def svg_to_png_inkscape(svg: str, size: int) -> bytes:
             os.unlink(tmp_path)
 
 
-def svg_to_png_cairosvg(svg: str, size: int) -> bytes:
+def svg_to_png_cairosvg(svg, size):
     import cairosvg
     return cairosvg.svg2png(url=svg, output_width=size, output_height=size)
 
@@ -58,14 +61,14 @@ def main():
     from PIL import Image
 
     if not os.path.exists(SVG_PATH):
-        print(f"SKIP: {SVG_PATH} が見つかりません")
+        print(f"SKIP: {SVG_PATH} not found")
         sys.exit(0)
 
-    # 変換方法を選択
     converter = None
     method    = ""
+
     try:
-        svg_to_png_inkscape(SVG_PATH, 16)   # 動作確認
+        svg_to_png_inkscape(SVG_PATH, 16)
         converter = svg_to_png_inkscape
         method    = "Inkscape"
     except Exception:
@@ -80,11 +83,10 @@ def main():
             pass
 
     if converter is None:
-        print("SKIP: Inkscape も cairosvg も利用できません。icon.ico なしでビルドを続行します。")
+        print("SKIP: Inkscape and cairosvg are both unavailable. Building without icon.")
         sys.exit(0)
 
-    print(f"変換方法: {method}")
-
+    print(f"Method: {method}")
     imgs = []
     for s in SIZES:
         png = converter(SVG_PATH, s)
@@ -97,7 +99,7 @@ def main():
         sizes=[(i.width, i.height) for i in imgs],
         append_images=imgs[1:],
     )
-    print(f"icon.ico 生成完了 ({ICO_PATH})")
+    print(f"Generated: {ICO_PATH}")
 
 
 if __name__ == "__main__":
