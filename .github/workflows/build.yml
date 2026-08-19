@@ -22,7 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # タグ取得のため全履歴を取得
+          fetch-depth: 0 # タグ取得のため全履歴を取得
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # ── 2. Python セットアップ ───────────────────
@@ -41,21 +41,7 @@ jobs:
 
       # ── 5. SVG → ICO 変換 ───────────────────────
       - name: Convert icon.svg to icon.ico
-        shell: pwsh
-        run: |
-          $script = @"
-import cairosvg, io
-from PIL import Image
-sizes = [16, 32, 48, 64, 128, 256]
-imgs = []
-for s in sizes:
-    png = cairosvg.svg2png(url='img/icon.svg', output_width=s, output_height=s)
-    imgs.append(Image.open(io.BytesIO(png)).convert('RGBA'))
-imgs[0].save('icon.ico', format='ICO', sizes=[(i.width, i.height) for i in imgs],
-             append_images=imgs[1:])
-print('icon.ico generated')
-"@
-          $script | python
+        run: python scripts/svg2ico.py
 
       # ── 6. VERSION.md からバージョンを取得 ───────
       - name: Read version
@@ -99,7 +85,7 @@ print('icon.ico generated')
             --name "EazyConnecter" `
             --add-data "VERSION.md;." `
             --icon "icon.ico" `
-            EazyConnecter.py
+            src/EazyConnecter.py
 
       # ── 7. EazyConnecter_Setup.exe ビルド ────────
       - name: Build EazyConnecter_Setup.exe
@@ -112,7 +98,7 @@ print('icon.ico generated')
             --name "EazyConnecter_Setup" `
             --add-data "VERSION.md;." `
             --icon "icon.ico" `
-            setup.py
+            src/setup.py
 
       # ── 8. 配布用 ZIP を作成 ─────────────────────
       - name: Create distribution ZIP
@@ -129,7 +115,7 @@ print('icon.ico generated')
           $files = @(
             @{ src = "dist\EazyConnecter.exe";       dst = "EazyConnecter.exe"       },
             @{ src = "dist\EazyConnecter_Setup.exe"; dst = "EazyConnecter_Setup.exe" },
-            @{ src = "servers.yaml";                 dst = "servers.yaml"             },
+            @{ src = "config/servers.yaml";          dst = "servers.yaml"             },
             @{ src = "VERSION.md";                   dst = "VERSION.md"               }
           )
           foreach ($f in $files) {
