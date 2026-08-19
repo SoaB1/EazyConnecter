@@ -1,18 +1,63 @@
 # EazyConnecter - exe ビルドスクリプト
 # 実行: .\build_exe.ps1
 # 出力:
-#   dist\EazyConnecter.exe  ... メインツール
-#   dist\EazyConnecter_Setup.exe ... セットアップウィザード
+#   dist\EazyConnecter.exe          ... メインツール
+#   dist\EazyConnecter_Setup.exe    ... セットアップウィザード
 #   dist\servers.yaml               ... サーバーリスト
-#   EazyConnecter_yyyyMMdd.zip      ... 配布用 ZIP（上記3ファイルをまとめたもの）
+#   EazyConnecter_vX.Y.Z.zip        ... 配布用 ZIP（上記3ファイルをまとめたもの）
 
 Set-Location (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Write-Host ""
 Write-Host "=== EazyConnecter exe ビルド ===" -ForegroundColor Cyan
 
-# [1/4] PyInstaller 確認
+# [0/5] SVG → ICO 変換
 Write-Host ""
-Write-Host "[1/4] PyInstaller を確認中..." -ForegroundColor Yellow
+Write-Host "[0/5] アイコンを変換中..." -ForegroundColor Yellow
+
+if (-not (Test-Path "icon.ico")) {
+    if (Test-Path "img/icon.svg") {
+        # Pillow で SVG→ICO 変換（cairosvg + Pillow）
+        $convertScript = @"
+try:
+    import cairosvg, io
+    from PIL import Image
+    sizes = [16, 32, 48, 64, 128, 256]
+    imgs = []
+    for s in sizes:
+        png = cairosvg.svg2png(url='img/icon.svg', output_width=s, output_height=s)
+        imgs.append(Image.open(io.BytesIO(png)).convert('RGBA'))
+    imgs[0].save('icon.ico', format='ICO', sizes=[(i.width, i.height) for i in imgs],
+                 append_images=imgs[1:])
+    print('OK: cairosvg')
+except Exception as e1:
+    try:
+        from PIL import Image
+        img = Image.open('img/icon.svg').convert('RGBA')
+        img.save('icon.ico', format='ICO', sizes=[(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)])
+        print('OK: pillow')
+    except Exception as e2:
+        print(f'SKIP: {e2}')
+"@
+        $convertScript | python
+        if (-not (Test-Path "icon.ico")) {
+            Write-Host "  cairosvg/Pillow が無い場合は pip install cairosvg pillow を実行してください" -ForegroundColor Yellow
+            Write-Host "  icon.ico なしでビルドを続行します" -ForegroundColor Yellow
+        }
+        else {
+            Write-Host "  icon.svg → icon.ico 変換完了" -ForegroundColor Green
+        }
+    }
+    else {
+        Write-Host "  icon.svg が見つかりません（スキップ）" -ForegroundColor Yellow
+    }
+}
+else {
+    Write-Host "  icon.ico は既に存在します（スキップ）" -ForegroundColor Green
+}
+
+# [1/5] PyInstaller 確認
+Write-Host ""
+Write-Host "[1/5] PyInstaller を確認中..." -ForegroundColor Yellow
 python -m PyInstaller --version 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  インストール中..." -ForegroundColor Yellow
@@ -24,18 +69,19 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "  OK" -ForegroundColor Green
 
-# [2/4] EazyConnecter.exe ビルド
+# [2/5] EazyConnecter.exe ビルド
 Write-Host ""
-Write-Host "[2/4] EazyConnecter.exe をビルド中..." -ForegroundColor Yellow
+Write-Host "[2/5] EazyConnecter.exe をビルド中..." -ForegroundColor Yellow
 
 $args1 = @(
     "-m", "PyInstaller",
     "--onefile",
     "--windowed",
     "--name", "EazyConnecter",
-    "--add-data", "VERSION.md;.",
-    "EazyConnecter.py"
+    "--add-data", "VERSION.md;."
 )
+if (Test-Path "icon.ico") { $args1 += @("--icon", "icon.ico") }
+$args1 += "EazyConnecter.py"
 python @args1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[エラー] EazyConnecter.exe のビルドに失敗しました。" -ForegroundColor Red
@@ -43,18 +89,19 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "  OK" -ForegroundColor Green
 
-# [3/4] EazyConnecter_Setup.exe ビルド
+# [3/5] EazyConnecter_Setup.exe ビルド
 Write-Host ""
-Write-Host "[3/4] EazyConnecter_Setup.exe をビルド中..." -ForegroundColor Yellow
+Write-Host "[3/5] EazyConnecter_Setup.exe をビルド中..." -ForegroundColor Yellow
 
 $args2 = @(
     "-m", "PyInstaller",
     "--onefile",
     "--windowed",
     "--name", "EazyConnecter_Setup",
-    "--add-data", "VERSION.md;.",
-    "setup.py"
+    "--add-data", "VERSION.md;."
 )
+if (Test-Path "icon.ico") { $args2 += @("--icon", "icon.ico") }
+$args2 += "setup.py"
 python @args2
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[エラー] EazyConnecter_Setup.exe のビルドに失敗しました。" -ForegroundColor Red
@@ -69,6 +116,7 @@ Copy-Item "servers.yaml" "dist\" -Force
 if (Test-Path "build") { Remove-Item "build"                    -Recurse -Force }
 if (Test-Path "EazyConnecter.spec") { Remove-Item "EazyConnecter.spec"       -Force }
 if (Test-Path "EazyConnecter_Setup.spec") { Remove-Item "EazyConnecter_Setup.spec" -Force }
+if (Test-Path "icon.ico") { Remove-Item "icon.ico"                   -Force }
 # config.yaml は配布不要のため dist\ へはコピーしない
 if (Test-Path "dist\config.yaml") { Remove-Item "dist\config.yaml"         -Force }
 Write-Host "  OK" -ForegroundColor Green
