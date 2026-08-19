@@ -22,7 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # タグ取得のため全履歴を取得
+          fetch-depth: 0   # タグ取得のため全履歴を取得
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # ── 2. Python セットアップ ───────────────────
@@ -35,7 +35,29 @@ jobs:
       - name: Install PyInstaller
         run: python -m pip install pyinstaller
 
-      # ── 4. VERSION.md からバージョンを取得 ───────
+      # ── 4. Pillow / cairosvg インストール（アイコン変換用）
+      - name: Install icon conversion tools
+        run: python -m pip install cairosvg pillow
+
+      # ── 5. SVG → ICO 変換 ───────────────────────
+      - name: Convert icon.svg to icon.ico
+        shell: pwsh
+        run: |
+          $script = @"
+import cairosvg, io
+from PIL import Image
+sizes = [16, 32, 48, 64, 128, 256]
+imgs = []
+for s in sizes:
+    png = cairosvg.svg2png(url='img/icon.svg', output_width=s, output_height=s)
+    imgs.append(Image.open(io.BytesIO(png)).convert('RGBA'))
+imgs[0].save('icon.ico', format='ICO', sizes=[(i.width, i.height) for i in imgs],
+             append_images=imgs[1:])
+print('icon.ico generated')
+"@
+          $script | python
+
+      # ── 6. VERSION.md からバージョンを取得 ───────
       - name: Read version
         id: version
         shell: pwsh
@@ -76,6 +98,7 @@ jobs:
             --windowed `
             --name "EazyConnecter" `
             --add-data "VERSION.md;." `
+            --icon "icon.ico" `
             EazyConnecter.py
 
       # ── 7. EazyConnecter_Setup.exe ビルド ────────
@@ -88,6 +111,7 @@ jobs:
             --windowed `
             --name "EazyConnecter_Setup" `
             --add-data "VERSION.md;." `
+            --icon "icon.ico" `
             setup.py
 
       # ── 8. 配布用 ZIP を作成 ─────────────────────
@@ -122,7 +146,7 @@ jobs:
           echo "ZIP_NAME=$zipName" >> $env:GITHUB_OUTPUT
           Write-Host "Created: $zipName"
 
-      # ── 9. Actions Artifact としてアップロード ───
+      # ── 10. Actions Artifact としてアップロード ───
       - name: Upload Artifact
         if: steps.tag_check.outputs.SKIP == 'false'
         uses: actions/upload-artifact@v4
@@ -131,7 +155,7 @@ jobs:
           path: ${{ steps.zip.outputs.ZIP_NAME }}
           retention-days: 90
 
-      # ── 10. タグを作成して push ──────────────────
+      # ── 11. タグを作成して push ──────────────────
       - name: Create and push tag
         if: steps.tag_check.outputs.SKIP == 'false'
         shell: pwsh
@@ -143,7 +167,7 @@ jobs:
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} $tag
           Write-Host "Pushed tag: $tag"
 
-      # ── 11. GitHub Release を作成して ZIP をアップ
+      # ── 12. GitHub Release を作成して ZIP をアップ
       - name: Create GitHub Release
         if: steps.tag_check.outputs.SKIP == 'false'
         uses: softprops/action-gh-release@v2
