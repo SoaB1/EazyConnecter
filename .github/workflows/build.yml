@@ -1,0 +1,148 @@
+name: Build and Release
+
+# VERSION.md が変更された push のみ起動
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - VERSION.md
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      # ── 1. チェックアウト ────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Python セットアップ ───────────────────
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # ── 3. PyInstaller インストール ──────────────
+      - name: Install PyInstaller
+        run: python -m pip install pyinstaller
+
+      # ── 4. VERSION.md からバージョンを取得 ───────
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $match = Select-String -Path "VERSION.md" -Pattern "^version:\s*([0-9]+\.[0-9]+\.[0-9]+)"
+          if (-not $match) {
+            Write-Error "VERSION.md にバージョンが見つかりません"
+            exit 1
+          }
+          $ver = $match.Matches[0].Groups[1].Value
+          echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
+          echo "TAG=v$ver"    >> $env:GITHUB_OUTPUT
+          Write-Host "Version: $ver"
+
+      # ── 5. タグが既に存在する場合はスキップ ──────
+      - name: Check if tag already exists
+        id: tag_check
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.version.outputs.TAG }}"
+          git fetch --tags
+          $exists = git tag -l $tag
+          if ($exists) {
+            echo "SKIP=true" >> $env:GITHUB_OUTPUT
+            Write-Host "Tag $tag already exists. Skipping build."
+          } else {
+            echo "SKIP=false" >> $env:GITHUB_OUTPUT
+            Write-Host "Tag $tag not found. Proceeding with build."
+          }
+
+      # ── 6. EazyConnecter.exe ビルド ──────────────
+      - name: Build EazyConnecter.exe
+        if: steps.tag_check.outputs.SKIP == 'false'
+        shell: pwsh
+        run: |
+          python -m PyInstaller `
+            --onefile `
+            --windowed `
+            --name "EazyConnecter" `
+            --add-data "VERSION.md;." `
+            EazyConnecter.py
+
+      # ── 7. EazyConnecter_Setup.exe ビルド ────────
+      - name: Build EazyConnecter_Setup.exe
+        if: steps.tag_check.outputs.SKIP == 'false'
+        shell: pwsh
+        run: |
+          python -m PyInstaller `
+            --onefile `
+            --windowed `
+            --name "EazyConnecter_Setup" `
+            --add-data "VERSION.md;." `
+            setup.py
+
+      # ── 8. 配布用 ZIP を作成 ─────────────────────
+      - name: Create distribution ZIP
+        if: steps.tag_check.outputs.SKIP == 'false'
+        id: zip
+        shell: pwsh
+        run: |
+          $ver     = "${{ steps.version.outputs.VERSION }}"
+          $zipName = "EazyConnecter_v${ver}.zip"
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::Open($zipName, "Create")
+
+          $files = @(
+            @{ src = "dist\EazyConnecter.exe";       dst = "EazyConnecter.exe"       },
+            @{ src = "dist\EazyConnecter_Setup.exe"; dst = "EazyConnecter_Setup.exe" },
+            @{ src = "servers.yaml";                 dst = "servers.yaml"             },
+            @{ src = "VERSION.md";                   dst = "VERSION.md"               }
+          )
+          foreach ($f in $files) {
+            if (Test-Path $f.src) {
+              [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $zip, $f.src, $f.dst, "Optimal") | Out-Null
+              Write-Host "  + $($f.dst)"
+            } else {
+              Write-Warning "  ! $($f.src) が見つかりません（スキップ）"
+            }
+          }
+          $zip.Dispose()
+
+          echo "ZIP_NAME=$zipName" >> $env:GITHUB_OUTPUT
+          Write-Host "Created: $zipName"
+
+      # ── 9. Actions Artifact としてアップロード ───
+      - name: Upload Artifact
+        if: steps.tag_check.outputs.SKIP == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: EazyConnecter-v${{ steps.version.outputs.VERSION }}
+          path: ${{ steps.zip.outputs.ZIP_NAME }}
+          retention-days: 90
+
+      # ── 10. タグを作成して push ──────────────────
+      - name: Create and push tag
+        if: steps.tag_check.outputs.SKIP == 'false'
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.version.outputs.TAG }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag $tag
+          git push origin $tag
+          Write-Host "Pushed tag: $tag"
+
+      # ── 11. GitHub Release を作成して ZIP をアップ
+      - name: Create GitHub Release
+        if: steps.tag_check.outputs.SKIP == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.TAG }}
+          name: EazyConnecter ${{ steps.version.outputs.TAG }}
+          body_path: VERSION.md
+          files: ${{ steps.zip.outputs.ZIP_NAME }}
+          draft: false
+          prerelease: false
