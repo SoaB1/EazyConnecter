@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - VERSION.md
+  workflow_dispatch:
 
 jobs:
   build:
