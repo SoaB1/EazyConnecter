@@ -2,10 +2,18 @@
 
 ## Current
 
-version: 1.4.0
+version: 1.5.1
 date: 2026-08-19
 
 ## Changelog
+
+### 1.5.1 (2026-08-19)
+- icon.svg を img/ フォルダへ移動
+- build_exe.ps1 / build.yml のアイコンパスを img/icon.svg に更新
+
+### 1.5.0 (2026-08-19)
+- アイコン (icon.svg) を追加
+- build_exe.ps1 / build.yml でSVG→ICO自動変換・exeへの組み込みに対応
 
 ### 1.4.0 (2026-08-19)
 - バージョン表示をヘッダータイトルに直接組み込み（"EazyConnecter  vX.Y.Z"形式）
