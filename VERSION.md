@@ -2,10 +2,18 @@
 
 ## Current
 
-version: 1.6.2
+version: 1.6.4
 date: 2026-08-19
 
 ## Changelog
+
+### 1.6.4 (2026-08-19)
+- icon.ico を img/ フォルダで直接管理（リポジトリにコミット）
+- build.yml / build_exe.ps1 のアイコン変換ステップを削除
+- img/icon.ico を直接 PyInstaller に渡すよう変更
+
+### 1.6.3 (2026-08-19)
+- build.yml の --icon オプションを icon.ico 存在時のみ渡すよう変更（アイコン変換スキップ時のビルドエラーを修正）
 
 ### 1.6.2 (2026-08-19)
 - svg2ico.py の日本語メッセージを英語化（CI環境のcp1252エンコードエラーを修正）
