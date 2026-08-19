@@ -23,3 +23,4 @@ config.yaml
 *.swp
 Thumbs.db
 Desktop.ini
+.old/
