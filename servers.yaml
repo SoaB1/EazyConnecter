@@ -1,0 +1,63 @@
+# ===================================================
+# サーバーリスト
+# ===================================================
+# 各サーバーの設定項目:
+#   name    : 表示名（必須）
+#   host    : IPアドレス or ホスト名（必須）
+#   os      : "windows" | "linux"（必須）
+#   user    : SSHユーザー名（linuxのみ・省略時はconfig.yamlのdefault_userを使用）
+#   port    : SSHポート（linuxのみ・省略時はconfig.yamlのdefault_portを使用）
+#   key     : SSH秘密鍵パス（linuxのみ・省略時はconfig.yamlのdefault_keyを使用）
+#   ssh_client: "teraterm"|"windowsterminal"|"powershell"（省略時はconfig.yamlのdefault_clientを使用）
+#   note    : メモ（表示のみ）
+# ===================================================
+
+groups:
+  - name: "管理系"
+    servers:
+      - name: "踏み台サーバー"
+        host: 192.168.1.10
+        os: linux
+        user: admin
+        note: "本番環境への踏み台"
+
+      - name: "Zabbix監視サーバー"
+        host: 192.168.1.20
+        os: linux
+        user: zabbix
+        note: "Zabbix 7.4"
+
+  - name: "Windows"
+    servers:
+      - name: "ファイルサーバー"
+        host: 192.168.1.30
+        os: windows
+        note: "FS-01"
+
+      - name: "バックアップサーバー (Veeam)"
+        host: 192.168.1.31
+        os: windows
+        note: "BK-01"
+
+  - name: "Linux"
+    servers:
+      - name: "Webサーバー #1"
+        host: 192.168.1.40
+        os: linux
+        user: deploy
+        port: 2222
+        note: "Apache / Port2222"
+
+      - name: "Webサーバー #2"
+        host: 192.168.1.41
+        os: linux
+        user: deploy
+        ssh_client: teraterm
+        note: "TeraTerm指定"
+
+      - name: "DBサーバー"
+        host: 192.168.1.50
+        os: linux
+        user: dbadmin
+        key: "C:\\Users\\masaya\\.ssh\\id_rsa_db"
+        note: "鍵認証専用"
