@@ -11,6 +11,7 @@ date: 2026-08-19
 - バージョン表示をヘッダータイトルに直接組み込み（"EazyConnecter  vX.Y.Z"形式）
 - `load_version` が exe 化時に `sys._MEIPASS` を優先参照するよう修正（vunknown問題を解消）
 - `build_exe.ps1` で `VERSION.md` を exe に同梱（`--add-data`）・ZIP にも含めるよう対応
+- GitHub Actions ワークフローを追加（VERSION.md 更新時に自動ビルド・リリース）
 
 ### 1.3.0 (2026-08-19)
 - セットアップウィザードのコンテンツエリアをスクロール対応に変更
