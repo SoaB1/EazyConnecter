@@ -56,9 +56,9 @@ else {
     Write-Host "  icon.ico は既に存在します（スキップ）" -ForegroundColor Green
 }
 
-# [1/5] PyInstaller 確認
+# [1/4] PyInstaller 確認
 Write-Host ""
-Write-Host "[1/5] PyInstaller を確認中..." -ForegroundColor Yellow
+Write-Host "[1/4] PyInstaller を確認中..." -ForegroundColor Yellow
 python -m PyInstaller --version 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  インストール中..." -ForegroundColor Yellow
@@ -70,19 +70,19 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "  OK" -ForegroundColor Green
 
-# [2/5] EazyConnecter.exe ビルド
+# [2/4] EazyConnecter.exe ビルド
 Write-Host ""
-Write-Host "[2/5] EazyConnecter.exe をビルド中..." -ForegroundColor Yellow
+Write-Host "[2/4] EazyConnecter.exe をビルド中..." -ForegroundColor Yellow
 
 $args1 = @(
     "-m", "PyInstaller",
     "--onefile",
     "--windowed",
     "--name", "EazyConnecter",
-    "--add-data", "VERSION.md;."
+    "--add-data", "VERSION.md;.",
+    "--icon", "img/icon.ico",
+    "src/EazyConnecter.py"
 )
-if (Test-Path "icon.ico") { $args1 += @("--icon", "icon.ico") }
-$args1 += "src/EazyConnecter.py"
 python @args1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[エラー] EazyConnecter.exe のビルドに失敗しました。" -ForegroundColor Red
@@ -90,19 +90,19 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "  OK" -ForegroundColor Green
 
-# [3/5] EazyConnecter_Setup.exe ビルド
+# [3/4] EazyConnecter_Setup.exe ビルド
 Write-Host ""
-Write-Host "[3/5] EazyConnecter_Setup.exe をビルド中..." -ForegroundColor Yellow
+Write-Host "[3/4] EazyConnecter_Setup.exe をビルド中..." -ForegroundColor Yellow
 
 $args2 = @(
     "-m", "PyInstaller",
     "--onefile",
     "--windowed",
     "--name", "EazyConnecter_Setup",
-    "--add-data", "VERSION.md;."
+    "--add-data", "VERSION.md;.",
+    "--icon", "img/icon.ico",
+    "src/setup.py"
 )
-if (Test-Path "icon.ico") { $args2 += @("--icon", "icon.ico") }
-$args2 += "src/setup.py"
 python @args2
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[エラー] EazyConnecter_Setup.exe のビルドに失敗しました。" -ForegroundColor Red
@@ -117,12 +117,11 @@ Copy-Item "config/servers.yaml" "dist\" -Force
 if (Test-Path "build") { Remove-Item "build"                    -Recurse -Force }
 if (Test-Path "EazyConnecter.spec") { Remove-Item "EazyConnecter.spec"       -Force }
 if (Test-Path "EazyConnecter_Setup.spec") { Remove-Item "EazyConnecter_Setup.spec" -Force }
-if (Test-Path "icon.ico") { Remove-Item "icon.ico"                   -Force }
 # config.yaml は配布不要のため dist\ へはコピーしない
 if (Test-Path "dist\config.yaml") { Remove-Item "dist\config.yaml"         -Force }
 Write-Host "  OK" -ForegroundColor Green
 
-# [5/5] ZIP圧縮
+# # [5/5] ZIP圧縮
 Write-Host ""
 Write-Host "[5/5] 配布用 ZIP を作成中..." -ForegroundColor Yellow
 
