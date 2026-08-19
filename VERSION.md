@@ -2,10 +2,14 @@
 
 ## Current
 
-version: 1.6.1
+version: 1.6.2
 date: 2026-08-19
 
 ## Changelog
+
+### 1.6.2 (2026-08-19)
+- svg2ico.py の日本語メッセージを英語化（CI環境のcp1252エンコードエラーを修正）
+- UTF-8出力を強制するよう変更
 
 ### 1.6.1 (2026-08-19)
 - svg2ico.py を Inkscape 優先方式に変更（cairosvg の Cairo DLL 不足エラーを修正）
