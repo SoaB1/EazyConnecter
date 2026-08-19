@@ -32,8 +32,14 @@ def detect_wt():
     return shutil.which("wt.exe") is not None
 
 def base_dir():
-    """実行ファイルと同じディレクトリ"""
-    return os.path.dirname(os.path.abspath(sys.argv[0]))
+    """
+    実行ファイルのディレクトリを返す。
+    開発時に src/ から実行している場合は一つ上のルートを返す。
+    """
+    d = os.path.dirname(os.path.abspath(sys.argv[0]))
+    if os.path.basename(d).lower() == "src":
+        return os.path.dirname(d)
+    return d
 
 def write_config(path, values):
     tt_path = values["teraterm_path"].replace("\\", "\\\\")

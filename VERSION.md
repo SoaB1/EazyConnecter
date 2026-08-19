@@ -2,10 +2,23 @@
 
 ## Current
 
-version: 1.5.1
+version: 1.6.0
 date: 2026-08-19
 
 ## Changelog
+
+### 1.6.0 (2026-08-19)
+- フォルダ構成を整理
+  - src/: EazyConnecter.py, setup.py
+  - scripts/: build_exe.ps1, svg2ico.py
+  - config/: config.yaml, servers.yaml（テンプレート）
+  - img/: icon.svg
+- 各スクリプトのファイル参照パスを新構成に合わせて修正
+- .gitignore に dist/ .old/ を追加
+
+### 1.5.2 (2026-08-19)
+- build.yml の SVG→ICO 変換処理をヒアドキュメントから scripts/svg2ico.py に変更（YAMLシンタックスエラーを修正）
+- build_exe.ps1 も同スクリプトを使用するよう統一
 
 ### 1.5.1 (2026-08-19)
 - icon.svg を img/ フォルダへ移動

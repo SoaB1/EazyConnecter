@@ -716,7 +716,13 @@ class App:
 # エントリーポイント
 # ─────────────────────────────────────────────────
 def main():
-    base = os.path.dirname(os.path.abspath(sys.argv[0]))
+    # exe化時: 実行ファイルのディレクトリ
+    # 開発時(src/から実行): 一つ上のルートディレクトリ
+    exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+    if os.path.basename(exe_dir).lower() == "src":
+        base = os.path.dirname(exe_dir)
+    else:
+        base = exe_dir
     root = tk.Tk()
     App(root, base)
     root.mainloop()

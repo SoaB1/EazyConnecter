@@ -6,7 +6,8 @@
 #   dist\servers.yaml               ... サーバーリスト
 #   EazyConnecter_vX.Y.Z.zip        ... 配布用 ZIP（上記3ファイルをまとめたもの）
 
-Set-Location (Split-Path -Parent $MyInvocation.MyCommand.Path)
+# scripts/ から実行されるのでルートディレクトリへ移動
+Set-Location (Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "..")
 Write-Host ""
 Write-Host "=== EazyConnecter exe ビルド ===" -ForegroundColor Cyan
 
@@ -81,7 +82,7 @@ $args1 = @(
     "--add-data", "VERSION.md;."
 )
 if (Test-Path "icon.ico") { $args1 += @("--icon", "icon.ico") }
-$args1 += "EazyConnecter.py"
+$args1 += "src/EazyConnecter.py"
 python @args1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[エラー] EazyConnecter.exe のビルドに失敗しました。" -ForegroundColor Red
@@ -101,7 +102,7 @@ $args2 = @(
     "--add-data", "VERSION.md;."
 )
 if (Test-Path "icon.ico") { $args2 += @("--icon", "icon.ico") }
-$args2 += "setup.py"
+$args2 += "src/setup.py"
 python @args2
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[エラー] EazyConnecter_Setup.exe のビルドに失敗しました。" -ForegroundColor Red
@@ -112,7 +113,7 @@ Write-Host "  OK" -ForegroundColor Green
 # [4/5] 後処理
 Write-Host ""
 Write-Host "[4/5] 後処理中..." -ForegroundColor Yellow
-Copy-Item "servers.yaml" "dist\" -Force
+Copy-Item "config/servers.yaml" "dist\" -Force
 if (Test-Path "build") { Remove-Item "build"                    -Recurse -Force }
 if (Test-Path "EazyConnecter.spec") { Remove-Item "EazyConnecter.spec"       -Force }
 if (Test-Path "EazyConnecter_Setup.spec") { Remove-Item "EazyConnecter_Setup.spec" -Force }
@@ -143,7 +144,7 @@ $distPath = Join-Path (Get-Location) "dist"
 $targets = @(
     "EazyConnecter.exe",
     "EazyConnecter_Setup.exe",
-    "servers.yaml",
+    "config/servers.yaml",
     "VERSION.md"
 )
 

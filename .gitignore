@@ -14,8 +14,8 @@ __pycache__/
 # ZIP 配布物
 *.zip
 
-# ユーザー固有の設定（各自で管理）
-config.yaml
+# ユーザー固有の設定（各自で管理・ウィザードが生成）
+config/config.yaml
 
 # エディタ・OS
 .vscode/
@@ -23,4 +23,7 @@ config.yaml
 *.swp
 Thumbs.db
 Desktop.ini
+
+# ビルド成果物・旧ファイル
+dist/
 .old/

@@ -32,12 +32,12 @@ groups:
       - name: "ファイルサーバー"
         host: 192.168.1.30
         os: windows
-        note: "FS-01"
+        note: "DVMN-FS-01"
 
       - name: "バックアップサーバー (Veeam)"
         host: 192.168.1.31
         os: windows
-        note: "BK-01"
+        note: "DVMN-BK-01"
 
   - name: "Linux"
     servers:

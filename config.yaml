@@ -1,0 +1,45 @@
+# ===================================================
+# connect-tool 設定ファイル
+# ===================================================
+
+# SSH接続ツール設定
+ssh:
+  # "teraterm" | "windowsterminal" | "powershell"
+  # windowsterminal : Windows Terminal + PowerShell SSH
+  # powershell      : PowerShell (conhost) + SSH
+  # teraterm        : TeraTerm
+  default_client: windowsterminal
+
+  # TeraTerm実行ファイルのパス（teraterm使用時）
+  teraterm_path: "C:\Program Files\teraterm\ttermpro.exe"
+
+  # SSH接続のデフォルトユーザー名（servers.yamlで個別指定がない場合に使用）
+  default_user: ""
+
+  # SSH秘密鍵のデフォルトパス（空欄の場合はパスワード認証）
+  # 例: "C:\\Users\\masaya\\.ssh\\id_rsa"
+  default_key: ""
+
+  # SSHポートのデフォルト（servers.yamlで個別指定がない場合）
+  default_port: 22
+
+# RDP設定
+rdp:
+  # /w /h でウィンドウサイズ指定 (空欄=フルスクリーン)
+  width: ""
+  height: ""
+
+  # マルチモニター使用 (true/false)
+  multimon: false
+
+# GUI設定
+gui:
+  # ウィンドウタイトル
+  title: "Server Connect"
+
+  # ウィンドウサイズ
+  window_width: 700
+  window_height: 540
+
+  # フォントサイズ
+  font_size: 10
