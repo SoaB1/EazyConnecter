@@ -2,10 +2,13 @@
 
 ## Current
 
-version: 2.1.1
+version: 2.1.2
 date: 2026-08-20
 
 ## Changelog
+
+### 2.1.2 (2026-08-20)
+- setup.py の複数箇所で未終端文字列・f文字列のSyntaxErrorを修正
 
 ### 2.1.1 (2026-08-20)
 - EazyConnecter.py のf文字列内クォート衝突によるSyntaxErrorを修正
