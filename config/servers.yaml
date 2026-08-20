@@ -9,6 +9,8 @@
 #   port    : SSHポート（linuxのみ・省略時はconfig.yamlのdefault_portを使用）
 #   key     : SSH秘密鍵パス（linuxのみ・省略時はconfig.yamlのdefault_keyを使用）
 #   ssh_client: "teraterm"|"windowsterminal"|"powershell"（省略時はconfig.yamlのdefault_clientを使用）
+#   op_item : 1Password のアイテム名またはUUID（省略時はDPAPI保存の認証情報を使用）
+#   op_vault: 1Password の Vault 名（省略時はデフォルトVault）
 #   note    : メモ（表示のみ）
 # ===================================================
 
@@ -19,6 +21,7 @@ groups:
         host: 192.168.1.10
         os: linux
         user: admin
+        op_item: "踏み台サーバー" # 1Passwordのアイテム名
         note: "本番環境への踏み台"
 
       - name: "Zabbix監視サーバー"
