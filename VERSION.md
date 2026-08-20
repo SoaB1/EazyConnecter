@@ -2,10 +2,26 @@
 
 ## Current
 
-version: 1.6.4
+version: 2.0.0
 date: 2026-08-19
 
 ## Changelog
+
+### 2.0.0 (2026-08-19)
+- 1Password 連携機能を追加（大規模機能追加）
+  - op CLI モード（Individual/Families/Teams/Business）
+    - op コマンド自動検出
+    - 認証ダイアログに 1Password セクションを追加
+    - 取得タイミング: 接続のたびに取得 / DPAPI に保存して使い回す
+  - Service Account モード（Business）
+    - op CLI + Service Account トークンで無人認証
+    - トークンは DPAPI 暗号化してローカル保存
+  - 1Password Connect モード（Business）
+    - Connect REST API 経由で取得（op コマンド不要）
+    - urllib のみ使用（外部ライブラリ不要）
+  - config.yaml に onepassword セクションを追加
+  - servers.yaml に op_item / op_vault フィールドを追加
+  - 認証ダイアログに現在のモードを表示
 
 ### 1.6.4 (2026-08-19)
 - icon.ico を img/ フォルダで直接管理（リポジトリにコミット）
