@@ -2,10 +2,13 @@
 
 ## Current
 
-version: 2.1.0
-date: 2026-08-19
+version: 2.1.1
+date: 2026-08-20
 
 ## Changelog
+
+### 2.1.1 (2026-08-20)
+- EazyConnecter.py のf文字列内クォート衝突によるSyntaxErrorを修正
 
 ### 2.1.0 (2026-08-19)
 - セットアップウィザードに 1Password ステップを追加
