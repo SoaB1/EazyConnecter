@@ -22,6 +22,37 @@ TERATERM_CANDIDATES = [
 # ─────────────────────────────────────────────────
 # ユーティリティ
 # ─────────────────────────────────────────────────
+def detect_op():
+    """op コマンドが使えるか確認"""
+    return shutil.which("op") is not None
+
+def detect_1p_app():
+    """1Password 本体アプリのインストール確認"""
+    candidates = [
+        r"C:\Program Files\1Password\app\8\1Password.exe",
+        r"C:\Program Files\1Password 7\1Password.exe",
+        r"C:\Program Files (x86)\1Password 7\1Password.exe",
+    ]
+    return any(os.path.exists(p) for p in candidates)
+
+def install_op_cli():
+    """winget で 1Password CLI をインストール"""
+    import subprocess
+    result = subprocess.run(
+        ["winget", "install", "--id", "AgileBits.1Password.CLI",
+         "--silent", "--accept-package-agreements", "--accept-source-agreements"],
+        capture_output=True, text=True)
+    return result.returncode == 0, result.stdout + result.stderr
+
+def install_1p_app():
+    """winget で 1Password 本体をインストール"""
+    import subprocess
+    result = subprocess.run(
+        ["winget", "install", "--id", "AgileBits.1Password",
+         "--silent", "--accept-package-agreements", "--accept-source-agreements"],
+        capture_output=True, text=True)
+    return result.returncode == 0, result.stdout + result.stderr
+
 def detect_teraterm():
     for p in TERATERM_CANDIDATES:
         if os.path.exists(p):
@@ -42,9 +73,10 @@ def base_dir():
     return d
 
 def write_config(path, values):
-    tt_path = values["teraterm_path"].replace("\\", "\\\\")
+    tt_path  = values["teraterm_path"].replace("\\", "\\\\")
     key_path = values["default_key"].replace("\\", "\\\\") if values["default_key"] else ""
-    content = f"""# ===================================================
+    op_mode  = values.get("op_mode", "op")
+    content  = f"""# ===================================================
 # EazyConnecter 設定ファイル (セットアップウィザードで生成)
 # ===================================================
 
@@ -65,6 +97,10 @@ gui:
   window_width: 760
   window_height: 560
   font_size: 10
+
+onepassword:
+  mode: {op_mode}
+  connect_host: "http://localhost:8080"
 """
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
@@ -81,7 +117,7 @@ class SetupWizard:
     CLR_OK     = "#107C10"
     CLR_WARN   = "#C84614"
 
-    STEPS = ["ようこそ", "配置先", "SSH設定", "確認"]
+    STEPS = ["ようこそ", "配置先", "SSH設定", "1Password", "確認"]
 
     def __init__(self, root):
         self.root  = root
@@ -96,6 +132,9 @@ class SetupWizard:
                                                "teraterm" if detect_teraterm() else "powershell")
         self.var_shortcut_desktop = tk.BooleanVar(value=True)
         self.var_shortcut_start   = tk.BooleanVar(value=True)
+        self.var_op_mode      = tk.StringVar(value='op')
+        self.var_install_op   = tk.BooleanVar(value=not detect_op())
+        self.var_install_1p   = tk.BooleanVar(value=not detect_1p_app())
 
         # フォント
         fs = 10
@@ -216,7 +255,7 @@ class SetupWizard:
         self._update_steps()
 
         pages = [self._page_welcome, self._page_install,
-                 self._page_ssh,     self._page_confirm]
+                 self._page_ssh,     self._page_1password, self._page_confirm]
         pages[self.step]()
 
         self.btn_back.config(state="normal" if self.step > 0 else "disabled")
@@ -377,17 +416,83 @@ class SetupWizard:
         if p:
             self.var_tt_path.set(p.replace("/", "\\"))
 
-    # ── Step 3: 確認 ─────────────────────────────
+    # ── Step 3: 1Password ──────────────────────────
+    def _page_1password(self):
+        CLR_OP = "#1A7F4B"
+        self._section("1Password 連携設定")
+
+        # op CLI の検出状態
+        op_ok = detect_op()
+        app_ok = detect_1p_app()
+
+        # op CLI ステータス
+        tk.Frame(self.content, bg="#CCC", height=1).pack(fill="x", pady=(0,8), padx=24)
+        self._section("1Password CLI (op コマンド)")
+        if op_ok:
+            self._note("✓  op コマンドが検出されました。インストール不要です。", CLR_OP)
+        else:
+            self._note("✗  op コマンドが見つかりません。", self.CLR_WARN)
+            tk.Checkbutton(self.content,
+                           text="winget で 1Password CLI をインストールする",
+                           variable=self.var_install_op,
+                           font=self.fn, bg=self.CLR_BG,
+                           activebackground=self.CLR_BG
+                           ).pack(anchor="w", padx=32, pady=2)
+
+        # 1Password 本体ステータス（op モード時のみ必要）
+        tk.Frame(self.content, bg="#CCC", height=1).pack(fill="x", pady=8, padx=24)
+        self._section("1Password 本体アプリ")
+        self._note("op CLI を通常モードで使う場合、1Password 本体アプリによるロック解除が必要です。
+"
+                   "Service Account / Connect モードでは本体アプリ不要です。", "#555")
+        if app_ok:
+            self._note("✓  1Password 本体アプリが検出されました。", CLR_OP)
+        else:
+            self._note("✗  1Password 本体アプリが見つかりません。", self.CLR_WARN)
+            tk.Checkbutton(self.content,
+                           text="winget で 1Password 本体アプリをインストールする",
+                           variable=self.var_install_1p,
+                           font=self.fn, bg=self.CLR_BG,
+                           activebackground=self.CLR_BG
+                           ).pack(anchor="w", padx=32, pady=2)
+
+        # 連携モード選択
+        tk.Frame(self.content, bg="#CCC", height=1).pack(fill="x", pady=8, padx=24)
+        self._section("連携モード")
+        modes = [
+            ("op",              "op CLI（Individual/Families/Teams/Business）"),
+            ("service_account", "Service Account（Business・op CLI +トークン認証）"),
+            ("connect",         "1Password Connect（Business・REST API・op 不要）"),
+        ]
+        for val, label in modes:
+            tk.Radiobutton(self.content, text=label,
+                           variable=self.var_op_mode, value=val,
+                           font=self.fn, bg=self.CLR_BG,
+                           activebackground=self.CLR_BG
+                           ).pack(anchor="w", padx=32, pady=2)
+
+        tk.Frame(self.content, bg=self.CLR_BG, height=4).pack()
+        self._note("※ Service Account / Connect モードのトークン設定は
+"
+                   "  EazyConnecter 起動後に「認証」ボタンから行ってください。", "#888")
+
+    # ── Step 4: 確認 ─────────────────────────────
     def _page_confirm(self):
         self._section("設定内容の確認")
         self._note("以下の設定で config.yaml を生成し、ファイルを配置します。")
         tk.Frame(self.content, bg="#CCC", height=1).pack(fill="x", pady=10, padx=24)
 
+        mode_labels = {
+            "op":              "op CLI",
+            "service_account": "Service Account",
+            "connect":         "1Password Connect",
+        }
         items = [
             ("配置先フォルダ",       self.var_install_dir.get()),
             ("SSH クライアント",     self.var_ssh_client.get()),
             ("TeraTerm パス",        self.var_tt_path.get() or "（未設定）"),
             ("デフォルトユーザー名", self.var_default_user.get() or "（未設定）"),
+            ("1Password モード",     mode_labels.get(self.var_op_mode.get(), self.var_op_mode.get())),
         ]
         for label, value in items:
             row = tk.Frame(self.content, bg=self.CLR_BG)
@@ -431,14 +536,44 @@ class SetupWizard:
     # ─────────────────────────────────────────────
     def _run_setup(self):
         dst = self.var_install_dir.get().strip()
-        src = base_dir()
+        src_dir = base_dir()
 
         try:
+            # 1Password CLI インストール
+            if self.var_install_op.get() and not detect_op():
+                self.root.update()
+                ok, log = install_op_cli()
+                if not ok:
+                    messagebox.showwarning("警告",
+                        f"1Password CLI のインストールに失敗しました。
+
+{log[:300]}
+
+"
+                        "手動でインストールしてください:
+"
+                        "winget install AgileBits.1Password.CLI")
+
+            # 1Password 本体インストール
+            if self.var_install_1p.get() and not detect_1p_app():
+                self.root.update()
+                ok, log = install_1p_app()
+                if not ok:
+                    messagebox.showwarning("警告",
+                        f"1Password のインストールに失敗しました。
+
+{log[:300]}
+
+"
+                        "手動でインストールしてください:
+"
+                        "winget install AgileBits.1Password")
+
             os.makedirs(dst, exist_ok=True)
 
             # ファイルコピー（setup.exe自身と同じフォルダにあるファイルを配置）
             for fname in ["EazyConnecter.exe", "servers.yaml"]:
-                s = os.path.join(src, fname)
+                s = os.path.join(src_dir, fname)
                 if os.path.exists(s):
                     shutil.copy2(s, os.path.join(dst, fname))
 
@@ -448,6 +583,7 @@ class SetupWizard:
                 "teraterm_path":  self.var_tt_path.get().strip(),
                 "default_user":   self.var_default_user.get().strip(),
                 "default_key":    self.var_default_key.get().strip(),
+                "op_mode":        self.var_op_mode.get(),
             })
 
             # ショートカット作成
