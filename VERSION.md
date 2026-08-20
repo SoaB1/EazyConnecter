@@ -2,10 +2,13 @@
 
 ## Current
 
-version: 2.1.2
+version: 2.1.3
 date: 2026-08-20
 
 ## Changelog
+
+### 2.1.3 (2026-08-20)
+- CredentialDialog の __init__ に cfg パラメータが抜けていた問題を修正（認証ボタンが無反応になるバグ）
 
 ### 2.1.2 (2026-08-20)
 - setup.py の複数箇所で未終端文字列・f文字列のSyntaxErrorを修正
