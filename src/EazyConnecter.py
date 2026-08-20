@@ -32,6 +32,158 @@ def load_version(base_dir: str) -> str:
                     return m.group(1)
     return "unknown"
 
+
+# ─────────────────────────────────────────────────
+# 1Password 連携
+# モード:
+#   op             : op CLI（Individual/Families/Teams/Business）
+#   service_account: op CLI + Service Account トークン（Business）
+#   connect        : 1Password Connect REST API（Business）
+# ─────────────────────────────────────────────────
+import shutil as _shutil
+import urllib.request as _urllib_req
+import urllib.error   as _urllib_err
+
+def detect_op() -> str | None:
+    """op コマンドのパスを返す。見つからない場合は None。"""
+    return _shutil.which("op")
+
+
+def _parse_op_fields(fields) -> tuple[str, str]:
+    """op CLI / Connect API の fields レスポンスから (username, password) を抽出"""
+    user = pw = ""
+    if isinstance(fields, list):
+        for f in fields:
+            purpose = f.get("purpose", "").upper()
+            fid     = (f.get("id") or "").lower()
+            label   = (f.get("label") or "").lower()
+            val     = f.get("value", "")
+            if purpose == "USERNAME" or fid == "username" or label == "username":
+                user = val
+            elif purpose == "PASSWORD" or fid == "password" or label == "password":
+                pw = val
+    elif isinstance(fields, dict):
+        user = fields.get("username", "")
+        pw   = fields.get("password", "")
+    return user, pw
+
+
+def op_get_credential_cli(item: str, vault: str = "",
+                           sa_token: str = "") -> tuple[str, str] | None:
+    """
+    op CLI で認証情報を取得。
+    sa_token が指定された場合は Service Account モードで動作。
+    """
+    op = detect_op()
+    if op is None:
+        raise RuntimeError("op コマンドが見つかりません。1Password CLI をインストールしてください。")
+    try:
+        env = os.environ.copy()
+        if sa_token:
+            env["OP_SERVICE_ACCOUNT_TOKEN"] = sa_token
+
+        cmd = [op, "item", "get", item,
+               "--fields", "label=username,label=password",
+               "--format", "json"]
+        if vault:
+            cmd += ["--vault", vault]
+
+        result = subprocess.run(cmd, capture_output=True, text=True,
+                                timeout=15, env=env)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip())
+
+        import json as _json
+        fields = _json.loads(result.stdout)
+        user, pw = _parse_op_fields(fields)
+        return (user, pw) if (user or pw) else None
+    except RuntimeError:
+        raise
+    except Exception as e:
+        raise RuntimeError(f"1Password CLI エラー: {e}")
+
+
+def op_get_credential_connect(item: str, vault: str = "",
+                               host: str = "http://localhost:8080",
+                               token: str = "") -> tuple[str, str] | None:
+    """
+    1Password Connect REST API で認証情報を取得。
+    host  : Connect サーバーの URL（例: http://localhost:8080）
+    token : Connect アクセストークン
+    """
+    import json as _json
+
+    if not token:
+        raise RuntimeError("Connect トークンが設定されていません。")
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type":  "application/json",
+    }
+
+    def _req(url):
+        req = _urllib_req.Request(url, headers=headers)
+        with _urllib_req.urlopen(req, timeout=10) as r:
+            return _json.loads(r.read().decode())
+
+    try:
+        # Vault ID を解決
+        vaults = _req(f"{host}/v1/vaults")
+        vault_id = None
+        if vault:
+            for v in vaults:
+                if v.get("name","").lower() == vault.lower() or v.get("id") == vault:
+                    vault_id = v["id"]
+                    break
+            if vault_id is None:
+                raise RuntimeError(f"Vault '{vault}' が見つかりません。")
+        else:
+            if not vaults:
+                raise RuntimeError("アクセス可能な Vault がありません。")
+            vault_id = vaults[0]["id"]
+
+        # アイテムを検索
+        items = _req(f"{host}/v1/vaults/{vault_id}/items?filter=title eq "{item}"")
+        if not items:
+            # フィルター非対応サーバー向けに全件から検索
+            items = _req(f"{host}/v1/vaults/{vault_id}/items")
+            items = [i for i in items
+                     if i.get("title","").lower() == item.lower()
+                     or i.get("id") == item]
+        if not items:
+            raise RuntimeError(f"アイテム '{item}' が見つかりません。")
+
+        item_id   = items[0]["id"]
+        item_data = _req(f"{host}/v1/vaults/{vault_id}/items/{item_id}")
+        user, pw  = _parse_op_fields(item_data.get("fields", []))
+        return (user, pw) if (user or pw) else None
+
+    except RuntimeError:
+        raise
+    except _urllib_err.URLError as e:
+        raise RuntimeError(f"Connect サーバーに接続できません: {e}")
+    except Exception as e:
+        raise RuntimeError(f"1Password Connect エラー: {e}")
+
+
+def op_get_credential(item: str, vault: str = "",
+                      mode: str = "op",
+                      sa_token: str = "",
+                      connect_host: str = "",
+                      connect_token: str = "") -> tuple[str, str] | None:
+    """
+    モードに応じて認証情報を取得するディスパッチャ。
+    mode: "op" | "service_account" | "connect"
+    """
+    if mode == "connect":
+        return op_get_credential_connect(item, vault,
+                                         connect_host or "http://localhost:8080",
+                                         connect_token)
+    elif mode == "service_account":
+        return op_get_credential_cli(item, vault, sa_token)
+    else:
+        return op_get_credential_cli(item, vault)
+
 # ─────────────────────────────────────────────────
 # DPAPI 暗号化ストア（Windows標準API使用）
 # ─────────────────────────────────────────────────
@@ -98,10 +250,17 @@ class CredentialStore:
             json.dump(self._data, f, indent=2)
 
     # ── 公開API ───────────────────────────────────
-    def set(self, host: str, username: str, password: str):
+    def set(self, host: str, username: str, password: str,
+            op_item: str = "", op_vault: str = "", op_mode: str = "dpapi"):
         """認証情報を暗号化して保存"""
-        enc = self._dpapi_encrypt(password)
-        self._data[host] = {"username": username, "password_enc": enc}
+        enc = self._dpapi_encrypt(password) if password else ""
+        self._data[host] = {
+            "username":     username,
+            "password_enc": enc,
+            "op_item":      op_item,
+            "op_vault":     op_vault,
+            "op_mode":      op_mode,  # "always" or "dpapi"
+        }
         self._save()
 
     def get(self, host: str):
@@ -109,8 +268,20 @@ class CredentialStore:
         if host not in self._data:
             return None
         entry = self._data[host]
-        pw = self._dpapi_decrypt(entry["password_enc"])
+        enc = entry.get("password_enc", "")
+        pw  = self._dpapi_decrypt(enc) if enc else ""
         return entry["username"], pw
+
+    def get_op_info(self, host: str) -> dict | None:
+        """1Password 連携情報を返す。未登録なら None"""
+        if host not in self._data:
+            return None
+        e = self._data[host]
+        return {
+            "op_item":  e.get("op_item",""),
+            "op_vault": e.get("op_vault",""),
+            "op_mode":  e.get("op_mode","dpapi"),
+        }
 
     def delete(self, host: str):
         if host in self._data:
@@ -126,18 +297,23 @@ class CredentialStore:
 # ─────────────────────────────────────────────────
 def parse_yaml_config(path):
     defaults = {
-        "ssh_default_client": "windowsterminal",
-        "ssh_teraterm_path":  r"C:\Program Files\teraterm\ttermpro.exe",
-        "ssh_default_user":   "",
-        "ssh_default_key":    "",
-        "ssh_default_port":   "22",
-        "rdp_width":          "",
-        "rdp_height":         "",
-        "rdp_multimon":       False,
-        "gui_title":          "EazyConnecter",
-        "gui_width":          760,
-        "gui_height":         560,
-        "gui_font_size":      10,
+        "ssh_default_client":     "windowsterminal",
+        "ssh_teraterm_path":      r"C:\Program Files\teraterm\ttermpro.exe",
+        "ssh_default_user":       "",
+        "ssh_default_key":        "",
+        "ssh_default_port":       "22",
+        "rdp_width":              "",
+        "rdp_height":             "",
+        "rdp_multimon":           False,
+        "gui_title":              "EazyConnecter",
+        "gui_width":              760,
+        "gui_height":             560,
+        "gui_font_size":          10,
+        # 1Password 連携設定
+        "op_mode":                "op",            # op / service_account / connect
+        "op_sa_token_enc":        "",              # Service Account トークン（DPAPI暗号化済み）
+        "op_connect_host":        "http://localhost:8080",
+        "op_connect_token_enc":   "",              # Connect トークン（DPAPI暗号化済み）
     }
     if not os.path.exists(path):
         return defaults
@@ -165,7 +341,11 @@ def parse_yaml_config(path):
                 elif key == "gui_title":          defaults["gui_title"]          = v
                 elif key == "gui_window_width":   defaults["gui_width"]          = int(v)
                 elif key == "gui_window_height":  defaults["gui_height"]         = int(v)
-                elif key == "gui_font_size":      defaults["gui_font_size"]      = int(v)
+                elif key == "gui_font_size":         defaults["gui_font_size"]          = int(v)
+                elif key == "onepassword_mode":              defaults["op_mode"]                = v
+                elif key == "onepassword_sa_token_enc":      defaults["op_sa_token_enc"]        = v
+                elif key == "onepassword_connect_host":      defaults["op_connect_host"]        = v
+                elif key == "onepassword_connect_token_enc": defaults["op_connect_token_enc"]   = v
     return defaults
 
 
@@ -175,7 +355,7 @@ def parse_yaml_servers(path):
     in_groups = in_servers = False
 
     def new_server():
-        return {"name":"","host":"","os":"linux","user":"","port":"","key":"","ssh_client":"","note":""}
+        return {"name":"","host":"","os":"linux","user":"","port":"","key":"","ssh_client":"","note":"","op_item":"","op_vault":""}
 
     with open(path, encoding="utf-8") as f:
         for raw in f:
@@ -223,6 +403,11 @@ def parse_yaml_servers(path):
                 k, v = m.group(1).strip(), m.group(2).strip()
                 if k in cur_server: cur_server[k] = v
                 continue
+            # op_item / op_vault（YAMLのkeyがアンダースコア区切り）
+            m2 = re.match(r"^(op_item|op_vault):\s*\"?([^\"#]*)\"?\s*$", stripped)
+            if indent == 8 and m2 and cur_server is not None:
+                cur_server[m2.group(1)] = m2.group(2).strip()
+                continue
 
     if cur_server and cur_group is not None: cur_group["servers"].append(cur_server)
     if cur_group is not None: groups.append(cur_group)
@@ -238,41 +423,99 @@ class CredentialDialog(tk.Toplevel):
         self.title(f"認証情報  —  {srv['name']}")
         self.resizable(False, False)
         self.grab_set()
-        self.result = None
+        self.result  = None
+        self.srv     = srv
+        self.store   = store
+        self.cfg     = cfg or {}
+        self._op_mode = self.cfg.get('op_mode', 'op')
+        self._op_available = (detect_op() is not None or self._op_mode == 'connect')
 
         font    = ("Meiryo UI", 10)
         font_sm = ("Meiryo UI", 9)
-        pad     = {"padx": 12, "pady": 6}
+        font_b  = ("Meiryo UI", 10, "bold")
+        CLR_OP  = "#1A7F4B"   # 1Password グリーン
 
         # 既存データがあれば初期値にセット
-        existing = store.get(srv["host"])
+        existing  = store.get(srv["host"])
         init_user = existing[0] if existing else (srv.get("user","") or "")
         init_pass = existing[1] if existing else ""
 
         tk.Label(self, text=f"ホスト:  {srv['host']}", font=font_sm,
                  fg="#555").pack(anchor="w", padx=12, pady=(12,0))
 
-        # ユーザー名
-        tk.Label(self, text="ユーザー名", font=font).pack(anchor="w", **pad)
-        self.ent_user = tk.Entry(self, font=font, width=30)
+        # ── 1Password セクション ─────────────────
+        op_item  = srv.get("op_item","")
+        op_vault = srv.get("op_vault","")
+
+        op_fr = tk.LabelFrame(self, text=" 1Password ", font=font_sm,
+                              fg=CLR_OP, padx=8, pady=6)
+        op_fr.pack(fill="x", padx=12, pady=(8,4))
+
+        # アイテム名
+        tk.Label(op_fr, text="アイテム名 (op_item)", font=font_sm).grid(
+            row=0, column=0, sticky="w", pady=2)
+        self.ent_op_item = tk.Entry(op_fr, font=font, width=26)
+        self.ent_op_item.insert(0, op_item)
+        self.ent_op_item.grid(row=0, column=1, padx=(6,0), pady=2, sticky="ew")
+
+        # Vault名
+        tk.Label(op_fr, text="Vault名 (省略可)", font=font_sm).grid(
+            row=1, column=0, sticky="w", pady=2)
+        self.ent_op_vault = tk.Entry(op_fr, font=font, width=26)
+        self.ent_op_vault.insert(0, op_vault)
+        self.ent_op_vault.grid(row=1, column=1, padx=(6,0), pady=2, sticky="ew")
+        op_fr.columnconfigure(1, weight=1)
+
+        # 取得タイミング
+        self.op_mode = tk.StringVar(value="always")
+        mode_fr = tk.Frame(op_fr)
+        mode_fr.grid(row=2, column=0, columnspan=2, sticky="w", pady=(4,0))
+        tk.Radiobutton(mode_fr, text="接続のたびに1Passwordから取得",
+                       variable=self.op_mode, value="always",
+                       font=font_sm).pack(side="left", padx=(0,10))
+        tk.Radiobutton(mode_fr, text="DPAPIに保存して使い回す",
+                       variable=self.op_mode, value="dpapi",
+                       font=font_sm).pack(side="left")
+
+        # 取得ボタン
+        mode_labels = {
+            'op':              'op CLI (Individual/Families/Teams/Business)',
+            'service_account': 'Service Account (Business)',
+            'connect':         '1Password Connect (Business)',
+        }
+        mode_label = mode_labels.get(self._op_mode, self._op_mode)
+        tk.Label(op_fr, text=f'接続モード: {mode_label}', font=font_sm,
+                 fg='#555').grid(row=3, column=0, columnspan=2, sticky='w', pady=(2,6))
+
+        op_state = "normal" if self._op_available else "disabled"
+        op_hint  = "" if self._op_available else "  (op コマンドが見つかりません)"
+        btn_op_fr = tk.Frame(op_fr)
+        btn_op_fr.grid(row=3, column=0, columnspan=2, sticky="w", pady=(6,0))
+        tk.Button(btn_op_fr, text="1Passwordから取得してフォームに入力",
+                  font=font_sm, bg=CLR_OP, fg="white", relief="flat",
+                  state=op_state, cursor="hand2",
+                  command=self._fetch_from_op).pack(side="left")
+        if op_hint:
+            tk.Label(btn_op_fr, text=op_hint, font=font_sm, fg="#C00").pack(side="left", padx=6)
+
+        # ── 手動入力セクション ────────────────────
+        tk.Label(self, text="ユーザー名", font=font).pack(anchor="w", padx=12, pady=(8,4))
+        self.ent_user = tk.Entry(self, font=font, width=34)
         self.ent_user.insert(0, init_user)
-        self.ent_user.pack(padx=12, pady=(0,6), fill="x")
+        self.ent_user.pack(padx=12, pady=(0,4), fill="x")
 
-        # パスワード
-        tk.Label(self, text="パスワード", font=font).pack(anchor="w", **pad)
-        self.ent_pass = tk.Entry(self, font=font, width=30, show="●")
+        tk.Label(self, text="パスワード", font=font).pack(anchor="w", padx=12, pady=(4,4))
+        self.ent_pass = tk.Entry(self, font=font, width=34, show="●")
         self.ent_pass.insert(0, init_pass)
-        self.ent_pass.pack(padx=12, pady=(0,6), fill="x")
+        self.ent_pass.pack(padx=12, pady=(0,4), fill="x")
 
-        # パスワード表示トグル
         self.show_pw = tk.BooleanVar(value=False)
         tk.Checkbutton(self, text="パスワードを表示", variable=self.show_pw,
                        font=font_sm, command=self._toggle_pw).pack(anchor="w", padx=12)
 
-        # ボタン行
+        # ── ボタン行 ──────────────────────────────
         btn_fr = tk.Frame(self)
         btn_fr.pack(fill="x", padx=12, pady=12)
-
         tk.Button(btn_fr, text="保存", font=font, width=10,
                   bg="#0078D4", fg="white", relief="flat",
                   command=self._save).pack(side="left", padx=(0,6))
@@ -283,19 +526,59 @@ class CredentialDialog(tk.Toplevel):
                   relief="flat", command=self.destroy).pack(side="right")
 
         self.center(parent)
-        self.ent_user.focus_set()
-        self.bind("<Return>", lambda _: self._save())
+        self.ent_op_item.focus_set()
         self.bind("<Escape>", lambda _: self.destroy())
+
+    def _fetch_from_op(self):
+        """1Password から認証情報を取得してフォームに入力"""
+        item  = self.ent_op_item.get().strip()
+        vault = self.ent_op_vault.get().strip()
+        if not item:
+            messagebox.showwarning("入力エラー", "アイテム名を入力してください。", parent=self)
+            return
+        try:
+            _s = CredentialStore.__new__(CredentialStore)
+            _s.__dict__.update({'path':'','_data':{}})
+            sa_token    = ''
+            connect_tok = ''
+            connect_host = self.cfg.get('op_connect_host','http://localhost:8080')
+            if self.cfg.get('op_sa_token_enc'):
+                try: sa_token = _s._dpapi_decrypt(self.cfg['op_sa_token_enc'])
+                except Exception: pass
+            if self.cfg.get('op_connect_token_enc'):
+                try: connect_tok = _s._dpapi_decrypt(self.cfg['op_connect_token_enc'])
+                except Exception: pass
+            cred = op_get_credential(
+                item, vault,
+                mode=self._op_mode,
+                sa_token=sa_token,
+                connect_host=connect_host,
+                connect_token=connect_tok,
+            )
+            if cred is None:
+                messagebox.showwarning("取得失敗", "認証情報が取得できませんでした。", parent=self)
+                return
+            user, pw = cred
+            self.ent_user.delete(0, "end"); self.ent_user.insert(0, user)
+            self.ent_pass.delete(0, "end"); self.ent_pass.insert(0, pw)
+        except RuntimeError as e:
+            messagebox.showerror("1Password エラー", str(e), parent=self)
 
     def _toggle_pw(self):
         self.ent_pass.config(show="" if self.show_pw.get() else "●")
 
     def _save(self):
-        self.result = ("save", self.ent_user.get(), self.ent_pass.get())
+        op_item  = self.ent_op_item.get().strip()
+        op_vault = self.ent_op_vault.get().strip()
+        op_mode  = self.op_mode.get()
+        self.result = ("save",
+                       self.ent_user.get(),
+                       self.ent_pass.get(),
+                       op_item, op_vault, op_mode)
         self.destroy()
 
     def _delete(self):
-        self.result = ("delete", "", "")
+        self.result = ("delete", "", "", "", "", "")
         self.destroy()
 
     def center(self, parent):
@@ -312,7 +595,51 @@ class CredentialDialog(tk.Toplevel):
 def connect_server(srv, cfg, store: CredentialStore):
     addr = srv["host"]
     os_  = srv["os"].lower()
-    cred = store.get(addr)   # (username, password) or None
+    # 1Password 連携設定をcfgから取得
+    op_mode         = cfg.get("op_mode", "op")
+    op_sa_token     = ""
+    op_connect_host = cfg.get("op_connect_host", "http://localhost:8080")
+    op_connect_tok  = ""
+
+    # DPAPI 復号（トークンが保存されている場合）
+    _store_tmp = CredentialStore.__new__(CredentialStore)
+    _store_tmp.__dict__.update({"path":"","_data":{}})
+    if cfg.get("op_sa_token_enc"):
+        try:
+            op_sa_token = _store_tmp._dpapi_decrypt(cfg["op_sa_token_enc"])
+        except Exception:
+            pass
+    if cfg.get("op_connect_token_enc"):
+        try:
+            op_connect_tok = _store_tmp._dpapi_decrypt(cfg["op_connect_token_enc"])
+        except Exception:
+            pass
+
+    def _fetch_from_1p(item, vault):
+        return op_get_credential(
+            item, vault,
+            mode=op_mode,
+            sa_token=op_sa_token,
+            connect_host=op_connect_host,
+            connect_token=op_connect_tok,
+        )
+
+    # 1Password "always" モードなら毎回取得
+    op_info = store.get_op_info(addr)
+    if op_info and op_info["op_item"] and op_info["op_mode"] == "always":
+        try:
+            cred = _fetch_from_1p(op_info["op_item"], op_info["op_vault"])
+        except Exception:
+            cred = store.get(addr)   # 失敗時はDPAPIにフォールバック
+    else:
+        cred = store.get(addr)   # (username, password) or None
+
+    # servers.yaml の op_item が直接指定されていてストアに登録がない場合も取得を試みる
+    if cred is None and srv.get("op_item",""):
+        try:
+            cred = _fetch_from_1p(srv["op_item"], srv.get("op_vault",""))
+        except Exception:
+            pass
 
     # ── Windows → RDP ───────────────────────────
     if os_ == "windows":
@@ -687,16 +1014,21 @@ class App:
 
     # ── 認証情報編集 ───────────────────────────────
     def _edit_credential(self, srv):
-        dlg = CredentialDialog(self.root, srv, self.store)
+        dlg = CredentialDialog(self.root, srv, self.store, self.cfg)
         self.root.wait_window(dlg)
         if dlg.result is None:
             return
-        action, user, pw = dlg.result
+        action, user, pw, op_item, op_vault, op_mode = dlg.result
         if action == "save":
-            if not user or not pw:
-                messagebox.showwarning("入力エラー", "ユーザー名とパスワードを入力してください。")
+            # op_item があればユーザー/パスは省略可
+            if not op_item and (not user or not pw):
+                messagebox.showwarning("入力エラー",
+                    "ユーザー名とパスワードを入力するか、1Passwordのアイテム名を指定してください。")
                 return
-            self.store.set(srv["host"], user, pw)
+            self.store.set(srv["host"], user, pw, op_item, op_vault, op_mode)
+            # servers.yaml の op_item も更新（メモリ上のみ）
+            srv["op_item"]  = op_item
+            srv["op_vault"] = op_vault
             self.status_var.set(f"認証情報を保存しました: {srv['name']}")
         elif action == "delete":
             self.store.delete(srv["host"])
