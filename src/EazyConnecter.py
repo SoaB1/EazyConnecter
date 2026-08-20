@@ -418,7 +418,7 @@ def parse_yaml_servers(path):
 # 認証情報登録ダイアログ
 # ─────────────────────────────────────────────────
 class CredentialDialog(tk.Toplevel):
-    def __init__(self, parent, srv, store: CredentialStore):
+    def __init__(self, parent, srv, store: CredentialStore, cfg: dict | None = None):
         super().__init__(parent)
         self.title(f"認証情報  —  {srv['name']}")
         self.resizable(False, False)
