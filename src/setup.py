@@ -442,8 +442,7 @@ class SetupWizard:
         # 1Password 本体ステータス（op モード時のみ必要）
         tk.Frame(self.content, bg="#CCC", height=1).pack(fill="x", pady=8, padx=24)
         self._section("1Password 本体アプリ")
-        self._note("op CLI を通常モードで使う場合、1Password 本体アプリによるロック解除が必要です。
-"
+        self._note("op CLI を通常モードで使う場合、1Password 本体アプリによるロック解除が必要です。\n"
                    "Service Account / Connect モードでは本体アプリ不要です。", "#555")
         if app_ok:
             self._note("✓  1Password 本体アプリが検出されました。", CLR_OP)
@@ -472,8 +471,7 @@ class SetupWizard:
                            ).pack(anchor="w", padx=32, pady=2)
 
         tk.Frame(self.content, bg=self.CLR_BG, height=4).pack()
-        self._note("※ Service Account / Connect モードのトークン設定は
-"
+        self._note("※ Service Account / Connect モードのトークン設定は\n"
                    "  EazyConnecter 起動後に「認証」ボタンから行ってください。", "#888")
 
     # ── Step 4: 確認 ─────────────────────────────
@@ -545,13 +543,8 @@ class SetupWizard:
                 ok, log = install_op_cli()
                 if not ok:
                     messagebox.showwarning("警告",
-                        f"1Password CLI のインストールに失敗しました。
-
-{log[:300]}
-
-"
-                        "手動でインストールしてください:
-"
+                        f"1Password CLI のインストールに失敗しました。\n\n{log[:300]}\n\n"
+                        "手動でインストールしてください:\n"
                         "winget install AgileBits.1Password.CLI")
 
             # 1Password 本体インストール
@@ -560,13 +553,8 @@ class SetupWizard:
                 ok, log = install_1p_app()
                 if not ok:
                     messagebox.showwarning("警告",
-                        f"1Password のインストールに失敗しました。
-
-{log[:300]}
-
-"
-                        "手動でインストールしてください:
-"
+                        f"1Password のインストールに失敗しました。\n\n{log[:300]}\n\n"
+                        "手動でインストールしてください:\n"
                         "winget install AgileBits.1Password")
 
             os.makedirs(dst, exist_ok=True)
