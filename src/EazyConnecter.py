@@ -143,7 +143,7 @@ def op_get_credential_connect(item: str, vault: str = "",
             vault_id = vaults[0]["id"]
 
         # アイテムを検索
-        items = _req(f"{host}/v1/vaults/{vault_id}/items?filter=title eq "{item}"")
+        items = _req(f"{host}/v1/vaults/{vault_id}/items?filter=title eq '{item}'")
         if not items:
             # フィルター非対応サーバー向けに全件から検索
             items = _req(f"{host}/v1/vaults/{vault_id}/items")
