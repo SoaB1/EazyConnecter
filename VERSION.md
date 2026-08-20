@@ -2,10 +2,17 @@
 
 ## Current
 
-version: 2.0.0
+version: 2.1.0
 date: 2026-08-19
 
 ## Changelog
+
+### 2.1.0 (2026-08-19)
+- セットアップウィザードに 1Password ステップを追加
+  - op CLI / 1Password 本体アプリの検出
+  - 未インストール時に winget で自動インストール
+  - 連携モード（op / service_account / connect）の選択
+  - 選択したモードを config.yaml に自動反映
 
 ### 2.0.0 (2026-08-19)
 - 1Password 連携機能を追加（大規模機能追加）
