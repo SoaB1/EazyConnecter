@@ -875,19 +875,19 @@ class App:
         ]):
             cell = tk.Frame(filter_fr, bg=self.CLR_GROUP)
             cell.grid(row=0, column=i, sticky="ew",
-                      padx=(8 if i==0 else 6, 6 if i<2 else 8), pady=5)
-            tk.Label(cell, text=lbl, font=("Consolas", fs-2),
+                      padx=(8 if i==0 else 6, 6 if i<2 else 8), pady=6)
+            tk.Label(cell, text=lbl, font=("Meiryo UI", fs-1, "bold"),
                      bg=self.CLR_GROUP, fg=self.CLR_ACCENT,
                      width=5, anchor="w").pack(side="left")
             ent = tk.Entry(cell, textvariable=var,
-                           font=("Consolas", fs-1),
+                           font=("Meiryo UI", fs-1),
                            bg=self.CLR_SURFACE, fg=self.CLR_FG,
                            insertbackground=self.CLR_ACCENT,
                            relief="flat", bd=0,
-                           highlightthickness=1,
+                           highlightthickness=2,
                            highlightbackground=self.CLR_BORDER,
                            highlightcolor=self.CLR_ACCENT)
-            ent.pack(side="left", fill="x", expand=True, ipady=3)
+            ent.pack(side="left", fill="x", expand=True, ipady=5)
         filter_fr.columnconfigure(0, weight=1)
         filter_fr.columnconfigure(1, weight=1)
         filter_fr.columnconfigure(2, weight=1)
@@ -900,7 +900,7 @@ class App:
         status_fr.pack(side="bottom", fill="x")
         status_fr.pack_propagate(False)
         tk.Label(status_fr, textvariable=self.status_var,
-                 font=("Consolas", fs-2), bg=self.CLR_BG,
+                 font=("Meiryo UI", fs-2), bg=self.CLR_BG,
                  fg=self.CLR_FG_SUB,
                  anchor="w", padx=10).pack(fill="both", expand=True)
 
@@ -986,7 +986,7 @@ class App:
             collapsed  = self._collapsed.get(grp_name, False)
 
             # グループヘッダー（クリックで折りたたみ）
-            gh = tk.Frame(self.inner, bg=self.CLR_GROUP, height=28)
+            gh = tk.Frame(self.inner, bg=self.CLR_GROUP, height=30)
             gh.pack(fill="x", pady=(6,0))
             gh.pack_propagate(False)
 
@@ -1026,79 +1026,104 @@ class App:
 
     # ── サーバー行 ─────────────────────────────────
     def _make_row(self, srv, W):
-        os_        = srv["os"].lower()
-        bg_badge   = self.CLR_WIN if os_ == "windows" else self.CLR_LIN
-        badge_text = "Windows"    if os_ == "windows" else "Linux"
-        has_cred   = self.store.has(srv["host"])
+        os_       = srv["os"].lower()
+        bar_color = self.CLR_WIN if os_ == "windows" else self.CLR_LIN
+        os_label  = "WIN" if os_ == "windows" else "LNX"
+        has_cred  = self.store.has(srv["host"])
+        fs        = self.cfg["gui_font_size"]
 
-        row = tk.Frame(self.inner, bg=self.CLR_PANEL, height=54)
+        row = tk.Frame(self.inner, bg=self.CLR_SURFACE, height=52)
         row.pack(fill="x", pady=(0,1))
         row.pack_propagate(False)
 
-        # OSバッジ
-        badge = tk.Label(row, text=badge_text, font=self.font_badge,
-                         bg=bg_badge, fg=self.CLR_WHITE, width=7, relief="flat")
-        badge.place(x=10, y=15, height=24)
+        # 左端カラーバー（OS種別）
+        bar = tk.Frame(row, bg=bar_color, width=4)
+        bar.pack(side="left", fill="y")
 
-        # 認証情報バッジ（登録済みの場合のみ）
+        # 内側コンテンツフレーム
+        inner = tk.Frame(row, bg=self.CLR_SURFACE)
+        inner.pack(side="left", fill="both", expand=True, padx=(10,0))
+
+        # OS ラベル（小さくモノスペース）
+        lbl_os = tk.Label(inner, text=os_label,
+                          font=("Consolas", fs - 3, "bold"),
+                          bg=bar_color, fg=self.CLR_WHITE,
+                          width=3, padx=2)
+        lbl_os.place(x=0, y=16, height=18)
+
+        name_x = 34
+
+        # 認証済みドット
         if has_cred:
-            cred_badge = tk.Label(row, text="鍵", font=("Meiryo UI", 8, "bold"),
-                                  bg=self.CLR_CRED, fg=self.CLR_WHITE, width=2, relief="flat")
-            cred_badge.place(x=82, y=15, height=24)
-            name_x = 110
-        else:
-            name_x = 86
+            tk.Label(inner, text="●", font=("Meiryo UI", 6),
+                     bg=self.CLR_SURFACE, fg=self.CLR_CRED
+                     ).place(x=name_x - 10, y=8)
 
-        # サーバー名
-        lbl_name = tk.Label(row, text=srv["name"], font=self.font_bold,
-                            bg=self.CLR_PANEL, fg="#1A1A1A", anchor="w")
-        lbl_name.place(x=name_x, y=7, height=22, width=W - name_x - 140)
+        # サーバー名（日本語対応: Meiryo UI）
+        lbl_name = tk.Label(inner, text=srv["name"],
+                            font=self.font_bold,
+                            bg=self.CLR_SURFACE, fg=self.CLR_FG, anchor="w")
+        lbl_name.place(x=name_x, y=5, height=22, width=W - name_x - 150)
 
-        # ホスト
-        lbl_host = tk.Label(row, text=srv["host"], font=self.font_small,
-                            bg=self.CLR_PANEL, fg=self.CLR_ACCENT, anchor="w")
-        lbl_host.place(x=name_x, y=30, height=18, width=180)
+        # ホスト（Consolas等幅）
+        lbl_host = tk.Label(inner, text=srv["host"],
+                            font=("Consolas", fs - 1),
+                            bg=self.CLR_SURFACE, fg=self.CLR_ACCENT, anchor="w")
+        lbl_host.place(x=name_x, y=28, height=18, width=180)
 
-        # メモ
+        # メモ（日本語対応: Meiryo UI）
         if srv["note"]:
-            lbl_note = tk.Label(row, text=srv["note"], font=self.font_small,
-                                bg=self.CLR_PANEL, fg=self.CLR_NOTE, anchor="w")
-            lbl_note.place(x=name_x+180, y=30, height=18, width=max(W - name_x - 330, 40))
+            lbl_note = tk.Label(inner, text=srv["note"],
+                                font=("Meiryo UI", fs - 2),
+                                bg=self.CLR_SURFACE, fg=self.CLR_NOTE, anchor="w")
+            lbl_note.place(x=name_x + 186, y=28, height=18,
+                           width=max(W - name_x - 340, 40))
 
-        # 認証情報ボタン
-        btn_cred = tk.Button(row, text="認証", font=("Meiryo UI", 9),
-                             bg=self.CLR_CRED if has_cred else "#888888",
-                             fg=self.CLR_WHITE, relief="flat", cursor="hand2", bd=0,
-                             activebackground="#0a5c0a", activeforeground=self.CLR_WHITE,
-                             command=lambda s=srv: self._edit_credential(s))
-        btn_cred.place(x=W - 136, y=13, width=46, height=28)
+        # ── ボタンエリア（右端）
+        btn_fr = tk.Frame(row, bg=self.CLR_SURFACE)
+        btn_fr.pack(side="right", fill="y", padx=8)
 
-        # 接続ボタン
-        btn = tk.Button(row, text="接続", font=self.font_normal,
-                        bg=self.CLR_ACCENT, fg=self.CLR_WHITE,
-                        relief="flat", cursor="hand2", bd=0,
-                        activebackground="#106EBE", activeforeground=self.CLR_WHITE,
-                        command=lambda s=srv: self._do_connect(s))
-        btn.place(x=W - 82, y=13, width=58, height=28)
+        def _mk_btn(parent, text, color, cmd):
+            b = tk.Button(parent, text=text,
+                          font=("Meiryo UI", fs - 1, "bold"),
+                          bg=color, fg=self.CLR_WHITE,
+                          relief="flat", bd=0, cursor="hand2",
+                          activebackground=self.CLR_ACCENT2,
+                          activeforeground=self.CLR_WHITE,
+                          padx=8, pady=2,
+                          width=5, command=cmd)
+            return b
 
+        cred_color = self.CLR_CRED if has_cred else "#2D333B"
+        btn_cred = _mk_btn(btn_fr, "auth", cred_color,
+                           lambda s=srv: self._edit_credential(s))
+        btn_cred.pack(side="left", padx=(0,4), pady=12, fill="y")
+
+        btn = _mk_btn(btn_fr, "connect", self.CLR_ACCENT,
+                      lambda s=srv: self._do_connect(s))
+        btn.pack(side="left", pady=12, fill="y")
+
+        # セパレーター
         sep = tk.Frame(row, bg=self.CLR_SEP, height=1)
         sep.place(x=0, rely=1.0, relwidth=1.0, anchor="sw")
 
-        hover_widgets = [row, badge, lbl_name, lbl_host]
+        hover_bg = self.CLR_HOVER
+        surf_bg  = self.CLR_SURFACE
+        h_widgets = [row, inner, lbl_name, lbl_host, lbl_os]
 
-        def on_enter(_, r=row, hw=hover_widgets, bc=bg_badge, b=btn, ba=badge):
-            r.config(bg=self.CLR_HOVER)
-            for w in hw: w.config(bg=self.CLR_HOVER)
-            ba.config(bg=bc); b.config(bg=self.CLR_ACCENT)
+        def on_enter(_, hw=h_widgets):
+            for w in hw: w.config(bg=hover_bg)
+            bar.config(bg=bar_color)
+            btn_fr.config(bg=hover_bg)
 
-        def on_leave(_, r=row, hw=hover_widgets, bc=bg_badge, b=btn, ba=badge):
-            r.config(bg=self.CLR_PANEL)
-            for w in hw: w.config(bg=self.CLR_PANEL)
-            ba.config(bg=bc); b.config(bg=self.CLR_ACCENT)
+        def on_leave(_, hw=h_widgets):
+            for w in hw: w.config(bg=surf_bg)
+            bar.config(bg=bar_color)
+            btn_fr.config(bg=surf_bg)
 
         def on_dbl(_, s=srv): self._do_connect(s)
 
-        for w in hover_widgets:
+        for w in h_widgets + [btn_fr]:
             w.bind("<Enter>",      on_enter)
             w.bind("<Leave>",      on_leave)
             w.bind("<Double-1>",   on_dbl)
