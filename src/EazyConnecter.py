@@ -765,19 +765,27 @@ def _ssh_with_password(addr, user, port, key, password):
 # GUI
 # ─────────────────────────────────────────────────
 class App:
-    CLR_BG     = "#F5F6FA"
-    CLR_PANEL  = "#FFFFFF"
-    CLR_ACCENT = "#0078D4"
-    CLR_GROUP  = "#E1EEFF"
-    CLR_HOVER  = "#D2E6FF"
-    CLR_WIN    = "#0078D4"
-    CLR_LIN    = "#C84614"
-    CLR_NOTE   = "#6E6E6E"
-    CLR_SEP    = "#E1E4EB"
-    CLR_STATUS = "#D7DEF0"
-    CLR_WHITE  = "#FFFFFF"
-    CLR_HDR_FG = "#FFFFFF"
-    CLR_CRED   = "#107C10"   # 認証情報登録済みバッジ色
+    # ── ダークテーマカラー ──────────────────────
+    CLR_BG      = "#0D1117"   # 最深背景
+    CLR_SURFACE = "#161B22"   # カード面
+    CLR_BORDER  = "#30363D"   # 境界線
+    CLR_ACCENT  = "#00B4D8"   # 電光ブルー（メインアクセント）
+    CLR_ACCENT2 = "#0077A8"   # アクセント暗め（ホバー等）
+    CLR_WIN     = "#2F81F7"   # Windowsバッジ
+    CLR_LIN     = "#3FB950"   # Linuxバッジ（端末グリーン）
+    CLR_CRED    = "#1A7F4B"   # 認証済みバッジ
+    CLR_GROUP   = "#1C2128"   # グループヘッダー面
+    CLR_HOVER   = "#1F2937"   # ホバー面
+    CLR_NOTE    = "#8B949E"   # サブテキスト
+    CLR_SEP     = "#21262D"   # セパレーター
+    CLR_STATUS  = "#161B22"   # ステータスバー
+    CLR_WHITE   = "#FFFFFF"
+    CLR_FG      = "#E6EDF3"   # メインテキスト
+    CLR_FG_SUB  = "#8B949E"   # サブテキスト
+    CLR_HDR_FG  = "#E6EDF3"
+    # 後方互換エイリアス
+    CLR_PANEL   = "#161B22"
+    CLR_BG_OLD  = "#0D1117"
 
     def __init__(self, root, base_dir):
         self.root     = root
@@ -805,50 +813,104 @@ class App:
         self.root.minsize(540, 400)
         self.root.configure(bg=self.CLR_BG)
 
-        # ヘッダー
-        self.hdr_frame = tk.Frame(self.root, bg=self.CLR_ACCENT, height=44)
+        fs = cfg["gui_font_size"]
+        font_btn = ("Meiryo UI", fs - 1)
+
+        # ── ヘッダー（細く、コンテンツ面積を最大化）
+        self.hdr_frame = tk.Frame(self.root, bg=self.CLR_BG,
+                                  highlightbackground=self.CLR_BORDER,
+                                  highlightthickness=1, height=40)
         self.hdr_frame.pack(side="top", fill="x")
         self.hdr_frame.pack_propagate(False)
+
+        # アクセントライン（左端の細いバー）
+        tk.Frame(self.hdr_frame, bg=self.CLR_ACCENT, width=3
+                 ).pack(side="left", fill="y")
+
         self.lbl_title = tk.Label(
-            self.hdr_frame, text=f"  {cfg['gui_title']}  v{self.version}",
-            font=self.font_title, bg=self.CLR_ACCENT, fg=self.CLR_HDR_FG, anchor="w")
-        self.lbl_title.pack(side="left", fill="both", expand=True, padx=4)
-        tk.Button(self.hdr_frame, text="⟳  リロード",
-                  font=("Meiryo UI", cfg["gui_font_size"] - 1),
-                  bg="#005A9E", fg=self.CLR_WHITE, relief="flat", bd=0,
-                  cursor="hand2", activebackground="#004578",
-                  activeforeground=self.CLR_WHITE, padx=10,
-                  command=self._reload).pack(side="right", padx=8, pady=8, fill="y")
+            self.hdr_frame,
+            text=f"  {cfg['gui_title']}",
+            font=self.font_title, bg=self.CLR_BG,
+            fg=self.CLR_FG, anchor="w")
+        self.lbl_title.pack(side="left", fill="y", padx=(6,0))
 
-        # 検索バー
-        search_fr = tk.Frame(self.root, bg=self.CLR_BG, height=36)
-        search_fr.pack(side="top", fill="x")
-        search_fr.pack_propagate(False)
-        self.search_var = tk.StringVar()
-        self.search_var.trace_add("write", lambda *_: self._render_list())
-        self._placeholder      = "サーバー名 / ホスト / メモで絞り込み..."
-        self._placeholder_active = True
-        self.search_entry = tk.Entry(search_fr, textvariable=self.search_var,
-                                     font=self.font_normal, relief="solid", bd=1, fg="#888888")
-        self.search_entry.insert(0, self._placeholder)
-        self.search_entry.pack(fill="x", padx=8, pady=5)
-        self.search_entry.bind("<FocusIn>",  self._on_search_focus)
-        self.search_entry.bind("<FocusOut>", self._on_search_blur)
+        self.lbl_ver = tk.Label(
+            self.hdr_frame,
+            text=f"v{self.version}",
+            font=("Consolas", fs - 2), bg=self.CLR_BG,
+            fg=self.CLR_ACCENT, anchor="w")
+        self.lbl_ver.pack(side="left", fill="y", padx=(4,0))
 
-        # ステータスバー
+        def _hdr_btn(text, cmd, tooltip=""):
+            b = tk.Button(self.hdr_frame, text=text, font=font_btn,
+                          bg=self.CLR_BG, fg=self.CLR_FG_SUB,
+                          relief="flat", bd=0, cursor="hand2",
+                          activebackground=self.CLR_HOVER,
+                          activeforeground=self.CLR_FG,
+                          padx=10, pady=0, command=cmd)
+            b.pack(side="right", fill="y", padx=2, pady=6)
+            b.bind("<Enter>", lambda e: b.config(fg=self.CLR_ACCENT))
+            b.bind("<Leave>", lambda e: b.config(fg=self.CLR_FG_SUB))
+            return b
+
+        _hdr_btn("↺  更新",  self._reload)
+        _hdr_btn("⊞  設定",  self._open_config_folder)
+
+        # ── フィルターバー
+        filter_fr = tk.Frame(self.root, bg=self.CLR_GROUP,
+                             highlightbackground=self.CLR_BORDER,
+                             highlightthickness=1)
+        filter_fr.pack(side="top", fill="x")
+
+        self.filter_name = tk.StringVar()
+        self.filter_host = tk.StringVar()
+        self.filter_note = tk.StringVar()
+        for v in (self.filter_name, self.filter_host, self.filter_note):
+            v.trace_add("write", lambda *_: self._render_list())
+
+        for i, (lbl, var) in enumerate([
+            ("name", self.filter_name),
+            ("host", self.filter_host),
+            ("note", self.filter_note),
+        ]):
+            cell = tk.Frame(filter_fr, bg=self.CLR_GROUP)
+            cell.grid(row=0, column=i, sticky="ew",
+                      padx=(8 if i==0 else 6, 6 if i<2 else 8), pady=5)
+            tk.Label(cell, text=lbl, font=("Consolas", fs-2),
+                     bg=self.CLR_GROUP, fg=self.CLR_ACCENT,
+                     width=5, anchor="w").pack(side="left")
+            ent = tk.Entry(cell, textvariable=var,
+                           font=("Consolas", fs-1),
+                           bg=self.CLR_SURFACE, fg=self.CLR_FG,
+                           insertbackground=self.CLR_ACCENT,
+                           relief="flat", bd=0,
+                           highlightthickness=1,
+                           highlightbackground=self.CLR_BORDER,
+                           highlightcolor=self.CLR_ACCENT)
+            ent.pack(side="left", fill="x", expand=True, ipady=3)
+        filter_fr.columnconfigure(0, weight=1)
+        filter_fr.columnconfigure(1, weight=1)
+        filter_fr.columnconfigure(2, weight=1)
+
+        # ── ステータスバー
         self.status_var = tk.StringVar(value="接続先を選択してダブルクリックで接続")
-        status_fr = tk.Frame(self.root, bg=self.CLR_STATUS, height=28)
+        status_fr = tk.Frame(self.root, bg=self.CLR_BG,
+                             highlightbackground=self.CLR_BORDER,
+                             highlightthickness=1, height=24)
         status_fr.pack(side="bottom", fill="x")
         status_fr.pack_propagate(False)
         tk.Label(status_fr, textvariable=self.status_var,
-                 font=self.font_small, bg=self.CLR_STATUS,
-                 anchor="w", padx=8).pack(fill="both", expand=True)
+                 font=("Consolas", fs-2), bg=self.CLR_BG,
+                 fg=self.CLR_FG_SUB,
+                 anchor="w", padx=10).pack(fill="both", expand=True)
 
-        # スクロールエリア
+        # ── スクロールエリア
         container = tk.Frame(self.root, bg=self.CLR_BG)
         container.pack(side="top", fill="both", expand=True)
-        self.canvas = tk.Canvas(container, bg=self.CLR_BG, highlightthickness=0, bd=0)
-        sb = tk.Scrollbar(container, orient="vertical", command=self.canvas.yview)
+        self.canvas = tk.Canvas(container, bg=self.CLR_BG,
+                                highlightthickness=0, bd=0)
+        sb = tk.Scrollbar(container, orient="vertical",
+                          command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
         self.canvas.pack(side="left", fill="both", expand=True)
@@ -860,13 +922,21 @@ class App:
         self.canvas.bind("<MouseWheel>", self._on_mousewheel)
         self.inner.bind("<MouseWheel>",  self._on_mousewheel)
 
+    # ── 設定フォルダを開く ─────────────────────────
+    def _open_config_folder(self):
+        try:
+            subprocess.Popen(["explorer", self.base_dir])
+        except Exception as e:
+            messagebox.showerror("エラー", str(e))
+
     # ── リロード ───────────────────────────────────
     def _reload(self):
         try:
             self._load_data()
             self.root.title(f"{self.cfg['gui_title']}  v{self.version}")
-            self.lbl_title.config(text=f"  {self.cfg['gui_title']}  v{self.version}",
+            self.lbl_title.config(text=f"  {self.cfg['gui_title']}",
                                   font=self.font_title)
+            self.lbl_ver.config(text=f"v{self.version}")
             self._reset_search()
             self._render_list()
             self.status_var.set("リロード完了")
@@ -874,26 +944,16 @@ class App:
             messagebox.showerror("リロードエラー", str(e))
 
     def _reset_search(self):
-        self.search_var.set("")
-        self.search_entry.delete(0, "end")
-        self.search_entry.insert(0, self._placeholder)
-        self.search_entry.config(fg="#888888")
-        self._placeholder_active = True
+        self.filter_name.set("")
+        self.filter_host.set("")
+        self.filter_note.set("")
 
-    def _on_search_focus(self, _):
-        if self._placeholder_active:
-            self.search_entry.delete(0, "end")
-            self.search_entry.config(fg="#000000")
-            self._placeholder_active = False
-
-    def _on_search_blur(self, _):
-        if self.search_var.get() == "":
-            self.search_entry.insert(0, self._placeholder)
-            self.search_entry.config(fg="#888888")
-            self._placeholder_active = True
-
-    def _get_filter(self):
-        return "" if self._placeholder_active else self.search_var.get()
+    def _get_filters(self):
+        return (
+            self.filter_name.get().lower(),
+            self.filter_host.get().lower(),
+            self.filter_note.get().lower(),
+        )
 
     def _on_canvas_configure(self, event):
         self.canvas.itemconfig(self.inner_id, width=event.width)
@@ -906,30 +966,62 @@ class App:
     def _render_list(self):
         for w in self.inner.winfo_children():
             w.destroy()
-        flt   = self._get_filter().lower()
+        fn, fh, fo = self._get_filters()
+        any_filter = fn or fh or fo
         total = 0
         W     = max(self.canvas.winfo_width() - 4, 300)
 
+        # グループの折りたたみ状態を保持（初回はすべて展開）
+        if not hasattr(self, '_collapsed'):
+            self._collapsed = {}
+
         for grp in self.groups:
-            servers = [s for s in grp["servers"] if not flt or
-                       flt in s["name"].lower() or
-                       flt in s["host"].lower()  or
-                       flt in s["note"].lower()]
+            servers = [s for s in grp["servers"] if
+                       (not fn or fn in s["name"].lower()) and
+                       (not fh or fh in s["host"].lower()) and
+                       (not fo or fo in s["note"].lower())]
             if not servers: continue
 
-            gh = tk.Frame(self.inner, bg=self.CLR_GROUP, height=26)
-            gh.pack(fill="x", pady=(4,0))
+            grp_name   = grp["name"]
+            collapsed  = self._collapsed.get(grp_name, False)
+
+            # グループヘッダー（クリックで折りたたみ）
+            gh = tk.Frame(self.inner, bg=self.CLR_GROUP, height=28)
+            gh.pack(fill="x", pady=(6,0))
             gh.pack_propagate(False)
-            tk.Label(gh, text=f"  {grp['name']}  ({len(servers)})",
-                     font=self.font_bold, bg=self.CLR_GROUP,
-                     fg=self.CLR_ACCENT, anchor="w").pack(fill="both", expand=True)
 
-            for srv in servers:
-                self._make_row(srv, W)
-                total += 1
+            # グループ左端アクセントライン
+            tk.Frame(gh, bg=self.CLR_ACCENT, width=2).pack(side="left", fill="y")
 
+            arrow = "▶" if collapsed else "▼"
+            lbl_gh = tk.Label(gh,
+                text=f"  {arrow}  {grp_name}",
+                font=self.font_bold, bg=self.CLR_GROUP,
+                fg=self.CLR_FG, anchor="w", cursor="hand2")
+            lbl_gh.pack(side="left", fill="y", expand=False)
+
+            tk.Label(gh, text=f"  {len(servers)}",
+                     font=("Consolas", self.cfg['gui_font_size'] - 1),
+                     bg=self.CLR_GROUP, fg=self.CLR_ACCENT,
+                     anchor="w").pack(side="left", fill="y")
+
+            def _toggle(g=grp_name):
+                self._collapsed[g] = not self._collapsed.get(g, False)
+                self._render_list()
+            gh.bind("<Button-1>", lambda e, g=grp_name: _toggle(g))
+            lbl_gh.bind("<Button-1>", lambda e, g=grp_name: _toggle(g))
+
+            if not collapsed:
+                for srv in servers:
+                    self._make_row(srv, W)
+                    total += 1
+            else:
+                total += len(servers)  # 折りたたみ中もカウント
+
+        flt_desc = ", ".join(f"{k}={v}" for k, v in
+                              [("name",fn),("host",fh),("note",fo)] if v)
         self.status_var.set(
-            f"{total} 件がヒット (フィルター: {flt})" if flt else
+            f"{total} 件がヒット ({flt_desc})" if any_filter else
             f"接続先を選択してダブルクリックで接続  — 合計 {total} 台")
 
     # ── サーバー行 ─────────────────────────────────
