@@ -355,7 +355,7 @@ def parse_yaml_servers(path):
     in_groups = in_servers = False
 
     def new_server():
-        return {"name":"","host":"","os":"linux","user":"","port":"","key":"","ssh_client":"","note":"","op_item":"","op_vault":""}
+        return {"name":"","host":"","os":"linux","user":"","port":"","key":"","ssh_client":"","note":"","op_item":"","op_vault":"","tags":""}
 
     with open(path, encoding="utf-8") as f:
         for raw in f:
@@ -810,117 +810,133 @@ class App:
         cfg = self.cfg
         self.root.title(f"{cfg['gui_title']}  v{self.version}")
         self.root.geometry(f"{cfg['gui_width']}x{cfg['gui_height']}")
-        self.root.minsize(540, 400)
+        self.root.minsize(600, 450)
         self.root.configure(bg=self.CLR_BG)
-
         fs = cfg["gui_font_size"]
-        font_btn = ("Meiryo UI", fs - 1)
 
-        # ── ヘッダー（細く、コンテンツ面積を最大化）
-        self.hdr_frame = tk.Frame(self.root, bg=self.CLR_BG,
-                                  highlightbackground=self.CLR_BORDER,
-                                  highlightthickness=1, height=40)
-        self.hdr_frame.pack(side="top", fill="x")
-        self.hdr_frame.pack_propagate(False)
+        # ── ヘッダー ─────────────────────────────────
+        hdr = tk.Frame(self.root, bg=self.CLR_BG,
+                       highlightbackground=self.CLR_BORDER, highlightthickness=1, height=48)
+        hdr.pack(side="top", fill="x")
+        hdr.pack_propagate(False)
+        tk.Frame(hdr, bg=self.CLR_ACCENT, width=3).pack(side="left", fill="y")
 
-        # アクセントライン（左端の細いバー）
-        tk.Frame(self.hdr_frame, bg=self.CLR_ACCENT, width=3
-                 ).pack(side="left", fill="y")
-
-        self.lbl_title = tk.Label(
-            self.hdr_frame,
-            text=f"  {cfg['gui_title']}",
-            font=self.font_title, bg=self.CLR_BG,
-            fg=self.CLR_FG, anchor="w")
-        self.lbl_title.pack(side="left", fill="y", padx=(6,0))
-
-        self.lbl_ver = tk.Label(
-            self.hdr_frame,
-            text=f"v{self.version}",
-            font=("Consolas", fs - 2), bg=self.CLR_BG,
-            fg=self.CLR_ACCENT, anchor="w")
+        self.lbl_title = tk.Label(hdr, text=f"  {cfg['gui_title']}",
+                                  font=self.font_title, bg=self.CLR_BG, fg=self.CLR_FG, anchor="w")
+        self.lbl_title.pack(side="left", fill="y")
+        self.lbl_ver = tk.Label(hdr, text=f"v{self.version}",
+                                font=("Consolas", fs-2), bg=self.CLR_BG, fg=self.CLR_ACCENT, anchor="w")
         self.lbl_ver.pack(side="left", fill="y", padx=(4,0))
 
-        def _hdr_btn(text, cmd, tooltip=""):
-            b = tk.Button(self.hdr_frame, text=text, font=font_btn,
+        def _hbtn(text, cmd):
+            b = tk.Button(hdr, text=text, font=("Meiryo UI", fs-1),
                           bg=self.CLR_BG, fg=self.CLR_FG_SUB,
                           relief="flat", bd=0, cursor="hand2",
-                          activebackground=self.CLR_HOVER,
-                          activeforeground=self.CLR_FG,
-                          padx=10, pady=0, command=cmd)
-            b.pack(side="right", fill="y", padx=2, pady=6)
-            b.bind("<Enter>", lambda e: b.config(fg=self.CLR_ACCENT))
-            b.bind("<Leave>", lambda e: b.config(fg=self.CLR_FG_SUB))
+                          activebackground=self.CLR_HOVER, activeforeground=self.CLR_FG,
+                          padx=10, command=cmd)
+            b.pack(side="right", fill="y", padx=2, pady=8)
+            b.bind("<Enter>", lambda e, b=b: b.config(fg=self.CLR_ACCENT))
+            b.bind("<Leave>", lambda e, b=b: b.config(fg=self.CLR_FG_SUB))
             return b
+        _hbtn("↺",                  self._reload)
+        _hbtn("⊞  設定",            self._open_config_folder)
+        _hbtn("＋  接続先を追加",   self._add_server_stub)
 
-        _hdr_btn("↺  更新",  self._reload)
-        _hdr_btn("⊞  設定",  self._open_config_folder)
+        # ── 検索バー（統合・Ctrl+K）────────────────────
+        search_wrap = tk.Frame(self.root, bg=self.CLR_BG,
+                               highlightbackground=self.CLR_BORDER, highlightthickness=1, height=46)
+        search_wrap.pack(side="top", fill="x")
+        search_wrap.pack_propagate(False)
 
-        # ── フィルターバー
-        filter_fr = tk.Frame(self.root, bg=self.CLR_GROUP,
-                             highlightbackground=self.CLR_BORDER,
-                             highlightthickness=1)
-        filter_fr.pack(side="top", fill="x")
+        search_inner = tk.Frame(search_wrap, bg=self.CLR_SURFACE,
+                                highlightbackground=self.CLR_BORDER, highlightthickness=1)
+        search_inner.pack(fill="x", padx=12, pady=7)
 
-        self.filter_name = tk.StringVar()
-        self.filter_host = tk.StringVar()
-        self.filter_note = tk.StringVar()
-        for v in (self.filter_name, self.filter_host, self.filter_note):
-            v.trace_add("write", lambda *_: self._render_list())
+        tk.Label(search_inner, text="  🔍", font=("Meiryo UI", fs),
+                 bg=self.CLR_SURFACE, fg=self.CLR_FG_SUB).pack(side="left")
+        self.search_var = tk.StringVar()
+        self.search_var.trace_add("write", lambda *_: self._render_list())
+        self.search_entry = tk.Entry(search_inner, textvariable=self.search_var,
+                                     font=("Meiryo UI", fs),
+                                     bg=self.CLR_SURFACE, fg=self.CLR_FG,
+                                     insertbackground=self.CLR_ACCENT,
+                                     relief="flat", bd=0)
+        self.search_entry.pack(side="left", fill="x", expand=True, ipady=4, padx=4)
+        self._placeholder = "名前・IP・メモ・タグで検索"
+        self.search_entry.insert(0, self._placeholder)
+        self.search_entry.config(fg=self.CLR_FG_SUB)
+        self._ph_active = True
+        self.search_entry.bind("<FocusIn>",  self._on_search_focus)
+        self.search_entry.bind("<FocusOut>", self._on_search_blur)
+        tk.Label(search_inner, text="Ctrl K  ", font=("Consolas", fs-2),
+                 bg=self.CLR_SURFACE, fg=self.CLR_FG_SUB).pack(side="right")
 
-        for i, (lbl, var) in enumerate([
-            ("name", self.filter_name),
-            ("host", self.filter_host),
-            ("note", self.filter_note),
-        ]):
-            cell = tk.Frame(filter_fr, bg=self.CLR_GROUP)
-            cell.grid(row=0, column=i, sticky="ew",
-                      padx=(8 if i==0 else 6, 6 if i<2 else 8), pady=6)
-            tk.Label(cell, text=lbl, font=("Meiryo UI", fs-1, "bold"),
-                     bg=self.CLR_GROUP, fg=self.CLR_ACCENT,
-                     width=5, anchor="w").pack(side="left")
-            ent = tk.Entry(cell, textvariable=var,
-                           font=("Meiryo UI", fs-1),
-                           bg=self.CLR_SURFACE, fg=self.CLR_FG,
-                           insertbackground=self.CLR_ACCENT,
-                           relief="flat", bd=0,
-                           highlightthickness=2,
-                           highlightbackground=self.CLR_BORDER,
-                           highlightcolor=self.CLR_ACCENT)
-            ent.pack(side="left", fill="x", expand=True, ipady=5)
-        filter_fr.columnconfigure(0, weight=1)
-        filter_fr.columnconfigure(1, weight=1)
-        filter_fr.columnconfigure(2, weight=1)
+        self.root.bind("<Control-k>", lambda e: (self.search_entry.focus_set(), "break"))
 
-        # ── ステータスバー
-        self.status_var = tk.StringVar(value="接続先を選択してダブルクリックで接続")
-        status_fr = tk.Frame(self.root, bg=self.CLR_BG,
-                             highlightbackground=self.CLR_BORDER,
-                             highlightthickness=1, height=24)
-        status_fr.pack(side="bottom", fill="x")
-        status_fr.pack_propagate(False)
-        tk.Label(status_fr, textvariable=self.status_var,
-                 font=("Meiryo UI", fs-2), bg=self.CLR_BG,
-                 fg=self.CLR_FG_SUB,
-                 anchor="w", padx=10).pack(fill="both", expand=True)
+        # ── タグチップフィルター ──────────────────────
+        self.tag_frame = tk.Frame(self.root, bg=self.CLR_BG)
+        self.tag_frame.pack(side="top", fill="x", padx=12, pady=(4,0))
+        self._active_tag = tk.StringVar(value="")
+        self._rebuild_tag_chips()
 
-        # ── スクロールエリア
+        # ── テーブルヘッダー ──────────────────────────
+        col_bg = self.CLR_GROUP
+        th = tk.Frame(self.root, bg=col_bg,
+                      highlightbackground=self.CLR_BORDER, highlightthickness=1, height=28)
+        th.pack(side="top", fill="x")
+        th.pack_propagate(False)
+        col_defs = [
+            ("",          3,  False),   # カラーバー
+            ("OS",       52,  False),
+            ("名前 / ホスト", 220, True),
+            ("タグ",     160,  True),
+            ("メモ",       0,  True),   # 0=expand
+            ("最終接続",  80,  False),
+            ("認証",      60,  False),
+            ("操作",      90,  False),
+        ]
+        self._col_defs = col_defs
+        for label, w, _ in col_defs:
+            lbl = tk.Label(th, text=label, font=("Meiryo UI", fs-2, "bold"),
+                           bg=col_bg, fg=self.CLR_FG_SUB, anchor="w")
+            if w == 0:
+                lbl.pack(side="left", fill="x", expand=True, padx=(4,0))
+            else:
+                lbl.pack(side="left", padx=(4,0))
+                lbl.config(width=w // (fs))   # 近似幅
+
+        # ── ステータスバー ────────────────────────────
+        self.status_var  = tk.StringVar(value="")
+        self.status_right = tk.StringVar(value="")
+        sb = tk.Frame(self.root, bg=self.CLR_BG,
+                      highlightbackground=self.CLR_BORDER, highlightthickness=1, height=28)
+        sb.pack(side="bottom", fill="x")
+        sb.pack_propagate(False)
+        tk.Label(sb, text="Enter 接続 · Space 選択 · Ctrl+K 検索",
+                 font=("Meiryo UI", fs-2), bg=self.CLR_BG, fg=self.CLR_FG_SUB,
+                 anchor="w", padx=10).pack(side="left", fill="y")
+        tk.Label(sb, textvariable=self.status_right,
+                 font=("Meiryo UI", fs-2), bg=self.CLR_BG, fg=self.CLR_FG_SUB,
+                 anchor="e", padx=10).pack(side="right", fill="y")
+
+        # ── スクロールエリア ──────────────────────────
         container = tk.Frame(self.root, bg=self.CLR_BG)
         container.pack(side="top", fill="both", expand=True)
-        self.canvas = tk.Canvas(container, bg=self.CLR_BG,
-                                highlightthickness=0, bd=0)
-        sb = tk.Scrollbar(container, orient="vertical",
-                          command=self.canvas.yview)
-        self.canvas.configure(yscrollcommand=sb.set)
-        sb.pack(side="right", fill="y")
+        self.canvas = tk.Canvas(container, bg=self.CLR_BG, highlightthickness=0, bd=0)
+        sb_w = tk.Scrollbar(container, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=sb_w.set)
+        sb_w.pack(side="right", fill="y")
         self.canvas.pack(side="left", fill="both", expand=True)
         self.inner    = tk.Frame(self.canvas, bg=self.CLR_BG)
         self.inner_id = self.canvas.create_window((0,0), window=self.inner, anchor="nw")
-        self.inner.bind("<Configure>",  lambda _: self.canvas.configure(
-                                         scrollregion=self.canvas.bbox("all")))
+        self.inner.bind("<Configure>",
+                        lambda _: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.bind("<Configure>", self._on_canvas_configure)
         self.canvas.bind("<MouseWheel>", self._on_mousewheel)
         self.inner.bind("<MouseWheel>",  self._on_mousewheel)
+        self.root.bind("<Return>", self._on_enter_key)
+        self.root.bind("<space>",  self._on_space_key)
+        self._selected_host = None
 
     # ── 設定フォルダを開く ─────────────────────────
     def _open_config_folder(self):
@@ -939,21 +955,91 @@ class App:
             self.lbl_ver.config(text=f"v{self.version}")
             self._reset_search()
             self._render_list()
-            self.status_var.set("リロード完了")
+            self.status_right.set("リロード完了")
         except Exception as e:
             messagebox.showerror("リロードエラー", str(e))
 
-    def _reset_search(self):
-        self.filter_name.set("")
-        self.filter_host.set("")
-        self.filter_note.set("")
+    def _on_search_focus(self, _):
+        if self._ph_active:
+            self.search_entry.delete(0, 'end')
+            self.search_entry.config(fg=self.CLR_FG)
+            self._ph_active = False
 
-    def _get_filters(self):
-        return (
-            self.filter_name.get().lower(),
-            self.filter_host.get().lower(),
-            self.filter_note.get().lower(),
-        )
+    def _on_search_blur(self, _):
+        if self.search_var.get() == '':
+            self.search_entry.insert(0, self._placeholder)
+            self.search_entry.config(fg=self.CLR_FG_SUB)
+            self._ph_active = True
+
+    def _reset_search(self):
+        self.search_var.set('')
+        self._active_tag.set('')
+        self.search_entry.delete(0, 'end')
+        self.search_entry.insert(0, self._placeholder)
+        self.search_entry.config(fg=self.CLR_FG_SUB)
+        self._ph_active = True
+        self._rebuild_tag_chips()
+
+    def _get_search_query(self):
+        if self._ph_active: return ''
+        return self.search_var.get().lower()
+
+    def _rebuild_tag_chips(self):
+        for w in self.tag_frame.winfo_children(): w.destroy()
+        # 全タグを収集
+        all_tags = set()
+        for grp in self.groups:
+            for srv in grp['servers']:
+                for t in (srv.get('tags','') or '').split(','):
+                    t = t.strip()
+                    if t: all_tags.add(t)
+        if not all_tags: return
+        cur = self._active_tag.get()
+        for tag in sorted(all_tags):
+            is_active = (tag == cur)
+            bg = self.CLR_ACCENT if is_active else self.CLR_SURFACE
+            fg = self.CLR_BG     if is_active else self.CLR_FG_SUB
+            btn = tk.Button(self.tag_frame, text=f' {tag} ',
+                            font=('Meiryo UI', self.cfg['gui_font_size']-2),
+                            bg=bg, fg=fg,
+                            relief='flat', bd=0, cursor='hand2',
+                            highlightthickness=1,
+                            highlightbackground=self.CLR_BORDER,
+                            command=lambda t=tag: self._toggle_tag(t))
+            btn.pack(side='left', padx=(0,4), pady=4)
+
+    def _toggle_tag(self, tag):
+        if self._active_tag.get() == tag:
+            self._active_tag.set('')
+        else:
+            self._active_tag.set(tag)
+        self._rebuild_tag_chips()
+        self._render_list()
+
+    def _add_server_stub(self):
+        messagebox.showinfo('接続先を追加',
+            'servers.yaml を直接編集して「↺ 更新」ボタンでリロードしてください。')
+
+    def _on_enter_key(self, _):
+        if self._selected_host:
+            # 選択中の行を接続
+            for grp in self.groups:
+                for srv in grp['servers']:
+                    if srv['host'] == self._selected_host:
+                        self._do_connect(srv); return
+
+    def _on_space_key(self, _):
+        pass  # 将来: 複数選択
+
+    def _get_search_filter(self, srv):
+        q   = self._get_search_query()
+        tag = self._active_tag.get()
+        tags = [t.strip() for t in (srv.get('tags','') or '').split(',') if t.strip()]
+        if tag and tag not in tags: return False
+        if not q: return True
+        return (q in srv['name'].lower() or q in srv['host'].lower() or
+                q in srv.get('note','').lower() or
+                any(q in t.lower() for t in tags))
 
     def _on_canvas_configure(self, event):
         self.canvas.itemconfig(self.inner_id, width=event.width)
@@ -964,46 +1050,40 @@ class App:
 
     # ── リスト描画 ─────────────────────────────────
     def _render_list(self):
-        for w in self.inner.winfo_children():
-            w.destroy()
-        fn, fh, fo = self._get_filters()
-        any_filter = fn or fh or fo
-        total = 0
-        W     = max(self.canvas.winfo_width() - 4, 300)
+        for w in self.inner.winfo_children(): w.destroy()
+        if not hasattr(self, '_collapsed'): self._collapsed = {}
 
-        # グループの折りたたみ状態を保持（初回はすべて展開）
-        if not hasattr(self, '_collapsed'):
-            self._collapsed = {}
+        W     = max(self.canvas.winfo_width() - 4, 400)
+        total = 0; connected = 0
 
         for grp in self.groups:
-            servers = [s for s in grp["servers"] if
-                       (not fn or fn in s["name"].lower()) and
-                       (not fh or fh in s["host"].lower()) and
-                       (not fo or fo in s["note"].lower())]
+            servers = [s for s in grp["servers"] if self._get_search_filter(s)]
             if not servers: continue
 
-            grp_name   = grp["name"]
-            collapsed  = self._collapsed.get(grp_name, False)
+            grp_name  = grp["name"]
+            collapsed = self._collapsed.get(grp_name, False)
 
-            # グループヘッダー（クリックで折りたたみ）
+            # グループヘッダー
             gh = tk.Frame(self.inner, bg=self.CLR_GROUP, height=30)
-            gh.pack(fill="x", pady=(6,0))
+            gh.pack(fill="x", pady=(4,0))
             gh.pack_propagate(False)
-
-            # グループ左端アクセントライン
             tk.Frame(gh, bg=self.CLR_ACCENT, width=2).pack(side="left", fill="y")
-
             arrow = "▶" if collapsed else "▼"
-            lbl_gh = tk.Label(gh,
-                text=f"  {arrow}  {grp_name}",
-                font=self.font_bold, bg=self.CLR_GROUP,
-                fg=self.CLR_FG, anchor="w", cursor="hand2")
-            lbl_gh.pack(side="left", fill="y", expand=False)
-
-            tk.Label(gh, text=f"  {len(servers)}",
-                     font=("Consolas", self.cfg['gui_font_size'] - 1),
-                     bg=self.CLR_GROUP, fg=self.CLR_ACCENT,
+            lbl_gh = tk.Label(gh, text=f"  {arrow}  {grp_name}",
+                              font=self.font_bold, bg=self.CLR_GROUP,
+                              fg=self.CLR_FG, anchor="w", cursor="hand2")
+            lbl_gh.pack(side="left", fill="y")
+            tk.Label(gh, text=f"  {len(servers)} 台",
+                     font=("Meiryo UI", self.cfg["gui_font_size"]-2),
+                     bg=self.CLR_GROUP, fg=self.CLR_FG_SUB,
                      anchor="w").pack(side="left", fill="y")
+
+            # グループ選択ボタン（右端）
+            tk.Button(gh, text="グループを選択",
+                      font=("Meiryo UI", self.cfg["gui_font_size"]-2),
+                      bg=self.CLR_GROUP, fg=self.CLR_ACCENT,
+                      relief="flat", bd=0, cursor="hand2",
+                      activebackground=self.CLR_HOVER).pack(side="right", padx=8, pady=4)
 
             def _toggle(g=grp_name):
                 self._collapsed[g] = not self._collapsed.get(g, False)
@@ -1016,119 +1096,189 @@ class App:
                     self._make_row(srv, W)
                     total += 1
             else:
-                total += len(servers)  # 折りたたみ中もカウント
+                total += len(servers)
 
-        flt_desc = ", ".join(f"{k}={v}" for k, v in
-                              [("name",fn),("host",fh),("note",fo)] if v)
-        self.status_var.set(
-            f"{total} 件がヒット ({flt_desc})" if any_filter else
-            f"接続先を選択してダブルクリックで接続  — 合計 {total} 台")
+        self.status_right.set(f"表示 {total} / 全 {total} 台")
 
+    # ── サーバー行 ─────────────────────────────────
     # ── サーバー行 ─────────────────────────────────
     def _make_row(self, srv, W):
         os_       = srv["os"].lower()
         bar_color = self.CLR_WIN if os_ == "windows" else self.CLR_LIN
         os_label  = "WIN" if os_ == "windows" else "LNX"
         has_cred  = self.store.has(srv["host"])
+        op_info   = self.store.get_op_info(srv["host"])
         fs        = self.cfg["gui_font_size"]
+        is_sel    = (self._selected_host == srv["host"])
 
-        row = tk.Frame(self.inner, bg=self.CLR_SURFACE, height=52)
+        surf = self.CLR_HOVER if is_sel else self.CLR_SURFACE
+        tags = [t.strip() for t in (srv.get("tags","") or "").split(",") if t.strip()]
+
+        row = tk.Frame(self.inner, bg=surf, height=48)
         row.pack(fill="x", pady=(0,1))
         row.pack_propagate(False)
 
-        # 左端カラーバー（OS種別）
-        bar = tk.Frame(row, bg=bar_color, width=4)
+        # ── 左端カラーバー
+        bar = tk.Frame(row, bg=bar_color, width=3)
         bar.pack(side="left", fill="y")
 
-        # 内側コンテンツフレーム
-        inner = tk.Frame(row, bg=self.CLR_SURFACE)
-        inner.pack(side="left", fill="both", expand=True, padx=(10,0))
+        # ── チェックボックス（未来の複数選択用）
+        chk_var = tk.BooleanVar(value=False)
+        chk = tk.Checkbutton(row, variable=chk_var, bg=surf,
+                             activebackground=surf, bd=0, relief="flat",
+                             cursor="hand2")
+        chk.pack(side="left", padx=(6,0))
 
-        # OS ラベル（小さくモノスペース）
-        lbl_os = tk.Label(inner, text=os_label,
-                          font=("Consolas", fs - 3, "bold"),
-                          bg=bar_color, fg=self.CLR_WHITE,
-                          width=3, padx=2)
-        lbl_os.place(x=0, y=16, height=18)
+        # ── OS バッジ
+        lbl_os = tk.Label(row, text=os_label,
+                          font=("Consolas", fs-2, "bold"),
+                          bg=bar_color, fg=self.CLR_WHITE, padx=4)
+        lbl_os.pack(side="left", padx=(4,6))
 
-        name_x = 34
+        # ── 状態ドット（オンライン判定は行わず認証有無で色分け）
+        dot_color = self.CLR_CRED if has_cred else self.CLR_FG_SUB
+        tk.Label(row, text="●", font=("Meiryo UI", 7),
+                 bg=surf, fg=dot_color).pack(side="left")
 
-        # 認証済みドット
+        # ── 名前 / ホスト（縦積み）
+        name_fr = tk.Frame(row, bg=surf, width=200)
+        name_fr.pack(side="left", fill="y", padx=(4,0))
+        name_fr.pack_propagate(False)
+        tk.Label(name_fr, text=srv["name"], font=self.font_bold,
+                 bg=surf, fg=self.CLR_FG, anchor="w"
+                 ).pack(fill="x", pady=(6,0))
+        host_txt = srv["host"]
+        if srv.get("port","") and srv["port"] not in ("","22"):
+            host_txt += f":{srv['port']}"
+        tk.Label(name_fr, text=host_txt, font=("Consolas", fs-2),
+                 bg=surf, fg=self.CLR_ACCENT, anchor="w"
+                 ).pack(fill="x")
+
+        # ── タグチップ列
+        tag_fr = tk.Frame(row, bg=surf, width=160)
+        tag_fr.pack(side="left", fill="y", padx=(8,0))
+        tag_fr.pack_propagate(False)
+        tag_inner = tk.Frame(tag_fr, bg=surf)
+        tag_inner.pack(side="left", fill="y")
+        TAG_COLORS = {
+            "本番":   ("#6E4BDB","#E8E0FF"),
+            "検証":   ("#1A7F4B","#D0F0E0"),
+            "踏み台": ("#0077A8","#C8E8F8"),
+            "鍵認証": ("#B05000","#FFE8C8"),
+            "Web":    ("#444444","#E0E0E0"),
+            "DB":     ("#8B0000","#FFD0D0"),
+            "監視":   ("#006060","#C0F0F0"),
+        }
+        for tag in tags:
+            tc = TAG_COLORS.get(tag, (self.CLR_BORDER, self.CLR_FG_SUB))
+            tk.Label(tag_inner, text=f" {tag} ",
+                     font=("Meiryo UI", fs-2),
+                     bg=tc[0], fg=tc[1],
+                     relief="flat").pack(side="left", padx=(0,3), pady=14)
+
+        # ── メモ（expand）
+        note_fr = tk.Frame(row, bg=surf)
+        note_fr.pack(side="left", fill="both", expand=True, padx=(8,0))
+        if srv.get("note",""):
+            tk.Label(note_fr, text=srv["note"], font=("Meiryo UI", fs-1),
+                     bg=surf, fg=self.CLR_NOTE, anchor="w"
+                     ).pack(fill="x", pady=14)
+
+        # ── 最終接続（将来実装）
+        tk.Label(row, text="—", font=("Meiryo UI", fs-2),
+                 bg=surf, fg=self.CLR_FG_SUB, width=7, anchor="w"
+                 ).pack(side="left", padx=(4,0))
+
+        # ── 認証状態列
         if has_cred:
-            tk.Label(inner, text="●", font=("Meiryo UI", 6),
-                     bg=self.CLR_SURFACE, fg=self.CLR_CRED
-                     ).place(x=name_x - 10, y=8)
+            auth_mode = (op_info or {}).get("op_mode","dpapi")
+            auth_txt  = "🔑 1P" if auth_mode in ("service_account","connect","op") and (op_info or {}).get("op_item","") else "🔑 PW"
+        else:
+            auth_txt = "—"
+        tk.Label(row, text=auth_txt, font=("Meiryo UI", fs-2),
+                 bg=surf, fg=self.CLR_FG_SUB if not has_cred else self.CLR_CRED,
+                 width=5, anchor="w").pack(side="left", padx=(4,0))
 
-        # サーバー名（日本語対応: Meiryo UI）
-        lbl_name = tk.Label(inner, text=srv["name"],
-                            font=self.font_bold,
-                            bg=self.CLR_SURFACE, fg=self.CLR_FG, anchor="w")
-        lbl_name.place(x=name_x, y=5, height=22, width=W - name_x - 150)
+        # ── 操作ボタン（接続のみ + ⋯）
+        op_fr = tk.Frame(row, bg=surf)
+        op_fr.pack(side="right", fill="y", padx=(0,8))
 
-        # ホスト（Consolas等幅）
-        lbl_host = tk.Label(inner, text=srv["host"],
-                            font=("Consolas", fs - 1),
-                            bg=self.CLR_SURFACE, fg=self.CLR_ACCENT, anchor="w")
-        lbl_host.place(x=name_x, y=28, height=18, width=180)
+        def _conn_btn_style(b, active=False):
+            b.config(bg=self.CLR_ACCENT if active else self.CLR_SURFACE,
+                     fg=self.CLR_WHITE if active else self.CLR_ACCENT,
+                     highlightthickness=1,
+                     highlightbackground=self.CLR_ACCENT)
 
-        # メモ（日本語対応: Meiryo UI）
-        if srv["note"]:
-            lbl_note = tk.Label(inner, text=srv["note"],
-                                font=("Meiryo UI", fs - 2),
-                                bg=self.CLR_SURFACE, fg=self.CLR_NOTE, anchor="w")
-            lbl_note.place(x=name_x + 186, y=28, height=18,
-                           width=max(W - name_x - 340, 40))
+        btn_conn = tk.Button(op_fr, text="接続",
+                             font=("Meiryo UI", fs-1, "bold"),
+                             bg=self.CLR_SURFACE, fg=self.CLR_ACCENT,
+                             relief="flat", bd=0, cursor="hand2",
+                             highlightthickness=1, highlightbackground=self.CLR_ACCENT,
+                             padx=10, pady=2,
+                             activebackground=self.CLR_ACCENT,
+                             activeforeground=self.CLR_WHITE,
+                             command=lambda s=srv: self._do_connect(s))
+        btn_conn.pack(side="left", pady=10)
+        btn_conn.bind("<Enter>", lambda e, b=btn_conn: _conn_btn_style(b, True))
+        btn_conn.bind("<Leave>", lambda e, b=btn_conn: _conn_btn_style(b, False))
 
-        # ── ボタンエリア（右端）
-        btn_fr = tk.Frame(row, bg=self.CLR_SURFACE)
-        btn_fr.pack(side="right", fill="y", padx=8)
+        # ⋯ メニューボタン（認証登録など）
+        def _show_menu(s=srv):
+            m = tk.Menu(self.root, tearoff=0, bg=self.CLR_SURFACE,
+                        fg=self.CLR_FG, activebackground=self.CLR_HOVER,
+                        activeforeground=self.CLR_FG, relief="flat", bd=1)
+            m.add_command(label="認証を登録", command=lambda: self._edit_credential(s))
+            m.add_command(label="接続",       command=lambda: self._do_connect(s))
+            try:
+                x = btn_more.winfo_rootx()
+                y = btn_more.winfo_rooty() + btn_more.winfo_height()
+                m.tk_popup(x, y)
+            finally:
+                m.grab_release()
 
-        def _mk_btn(parent, text, color, cmd):
-            b = tk.Button(parent, text=text,
-                          font=("Meiryo UI", fs - 1, "bold"),
-                          bg=color, fg=self.CLR_WHITE,
-                          relief="flat", bd=0, cursor="hand2",
-                          activebackground=self.CLR_ACCENT2,
-                          activeforeground=self.CLR_WHITE,
-                          padx=8, pady=2,
-                          width=5, command=cmd)
-            return b
-
-        cred_color = self.CLR_CRED if has_cred else "#2D333B"
-        btn_cred = _mk_btn(btn_fr, "auth", cred_color,
-                           lambda s=srv: self._edit_credential(s))
-        btn_cred.pack(side="left", padx=(0,4), pady=12, fill="y")
-
-        btn = _mk_btn(btn_fr, "connect", self.CLR_ACCENT,
-                      lambda s=srv: self._do_connect(s))
-        btn.pack(side="left", pady=12, fill="y")
+        btn_more = tk.Button(op_fr, text="⋯",
+                             font=("Meiryo UI", fs),
+                             bg=surf, fg=self.CLR_FG_SUB,
+                             relief="flat", bd=0, cursor="hand2",
+                             activebackground=self.CLR_HOVER,
+                             padx=4,
+                             command=_show_menu)
+        btn_more.pack(side="left", pady=10, padx=(4,0))
 
         # セパレーター
-        sep = tk.Frame(row, bg=self.CLR_SEP, height=1)
-        sep.place(x=0, rely=1.0, relwidth=1.0, anchor="sw")
+        tk.Frame(row, bg=self.CLR_SEP, height=1
+                 ).place(x=0, rely=1.0, relwidth=1.0, anchor="sw")
 
-        hover_bg = self.CLR_HOVER
-        surf_bg  = self.CLR_SURFACE
-        h_widgets = [row, inner, lbl_name, lbl_host, lbl_os]
+        # ── ホバー・選択イベント
+        h_all = [row, bar, chk, lbl_os, name_fr, note_fr, op_fr, tag_fr, tag_inner]
 
-        def on_enter(_, hw=h_widgets):
-            for w in hw: w.config(bg=hover_bg)
-            bar.config(bg=bar_color)
-            btn_fr.config(bg=hover_bg)
+        def on_enter(_, hw=h_all, bc=bar_color):
+            for w in hw:
+                try: w.config(bg=self.CLR_HOVER)
+                except: pass
+            bar.config(bg=bc); lbl_os.config(bg=bc)
 
-        def on_leave(_, hw=h_widgets):
-            for w in hw: w.config(bg=surf_bg)
-            bar.config(bg=bar_color)
-            btn_fr.config(bg=surf_bg)
+        def on_leave(_, hw=h_all, bc=bar_color):
+            bg = self.CLR_HOVER if is_sel else self.CLR_SURFACE
+            for w in hw:
+                try: w.config(bg=bg)
+                except: pass
+            bar.config(bg=bc); lbl_os.config(bg=bc)
+
+        def on_click(_, s=srv):
+            self._selected_host = s["host"]
+            self._render_list()
 
         def on_dbl(_, s=srv): self._do_connect(s)
 
-        for w in h_widgets + [btn_fr]:
+        for w in h_all:
             w.bind("<Enter>",      on_enter)
             w.bind("<Leave>",      on_leave)
+            w.bind("<Button-1>",   on_click)
             w.bind("<Double-1>",   on_dbl)
             w.bind("<MouseWheel>", self._on_mousewheel)
 
+    # ── 認証情報編集 ───────────────────────────────
     # ── 認証情報編集 ───────────────────────────────
     def _edit_credential(self, srv):
         dlg = CredentialDialog(self.root, srv, self.store, self.cfg)
