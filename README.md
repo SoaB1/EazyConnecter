@@ -24,9 +24,13 @@ Windows 向けサーバー接続ランチャー。YAML で管理したサーバ�
 
 ```
 EazyConnecter/
-├── EazyConnecter.py      # メインツール
-├── setup.py              # セットアップウィザード
-├── build_exe.ps1         # exe ビルド & ZIP 生成スクリプト
+├── src/
+│   ├── EazyConnecter.py  # メインツール（pywebviewエントリーポイント）
+│   ├── api.py            # pywebview js_api層
+│   ├── core/             # ビジネスロジック（YAMLパーサー・DPAPI・1Password・接続処理）
+│   └── setup.py          # セットアップウィザード
+├── frontend/              # GUI本体（React + TypeScript, Vite）
+├── scripts/build_exe.ps1 # exe ビルド & ZIP 生成スクリプト
 ├── config.yaml           # ツール設定
 ├── servers.yaml          # サーバーリスト
 ├── VERSION.md            # バージョン管理
@@ -39,13 +43,14 @@ EazyConnecter/
 
 | 要件 | バージョン |
 |------|-----------|
-| Python | 3.8 以上 |
+| Python | 3.13 以上 |
+| Node.js | 24 以上（フロントエンドビルド用） |
 | Windows | 10 / 11 (64bit) |
 
 ### 配布先（エンドユーザー）
 
-- Windows 10 / 11 (64bit)
-- Python **不要**（exe 化済み）
+- Windows 10 / 11 (64bit)、Microsoft Edge WebView2 ランタイム（多くの環境でプリインストール済み）
+- Python / Node.js **不要**（exe 化済み）
 
 ## セットアップ
 
@@ -56,8 +61,14 @@ EazyConnecter/
 git clone https://github.com/SoaB1/EazyConnecter.git
 cd EazyConnecter
 
-# 直接実行
-python EazyConnecter.py
+# Python依存関係
+pip install -r requirements.txt
+
+# フロントエンドをビルド
+cd frontend && npm install && npm run build && cd ..
+
+# 実行
+python src\EazyConnecter.py
 ```
 
 ### exe のビルドと配布
@@ -67,7 +78,7 @@ python EazyConnecter.py
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 # ビルド実行
-.\build_exe.ps1
+.\scripts\build_exe.ps1
 ```
 
 `dist\` フォルダと `EazyConnecter_vX.Y.Z.zip` が生成されます。
