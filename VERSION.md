@@ -2,10 +2,21 @@
 
 ## Current
 
-version: 2.4.0
-date: 2026-08-20
+version: 3.0.0
+date: 2026-09-05
 
 ## Changelog
+
+### 3.0.0 (2026-09-05)
+- GUIをtkinterからReact + pywebviewへ全面移行
+  - ビジネスロジック（YAMLパーサー、DPAPI暗号化ストア、1Password連携、RDP/SSH接続処理）は `src/core/` に切り出して再利用、ロジック自体は変更なし
+  - `.credentials` / `config.yaml` / `servers.yaml` のフォーマットは変更なし（既存の資産はそのまま使える）
+  - `_ssh_with_password` のクリップボード自動入力を、tkinterに依存しないWindows API直呼び実装に変更
+  - `_render_list()` の全行destroy&再生成をやめ、Reactの差分レンダリングに変更（パフォーマンス改善）
+  - ビルドに `frontend/`（Vite + React + TypeScript）が追加、PyInstallerが`frontend/dist`を同梱
+  - 新規依存: `pywebview`（Python）、Node.js/npm（ビルド時のみ）
+  - 今回はUIの1:1移植のみが対象。詳細パネル・複数選択まとめて接続・左サイドバーツリー等は次バージョンで対応予定
+  - `EazyConnecter_Setup.exe`（セットアップウィザード）は現状tkinterのまま変更なし
 
 ### 2.4.0 (2026-08-20)
 - UIを画像改善案に基づいて全面刷新
