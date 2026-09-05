@@ -11,6 +11,7 @@
 #   ssh_client: "teraterm"|"windowsterminal"|"powershell"（省略時はconfig.yamlのdefault_clientを使用）
 #   op_item : 1Password のアイテム名またはUUID（省略時はDPAPI保存の認証情報を使用）
 #   op_vault: 1Password の Vault 名（省略時はデフォルトVault）
+#   tags    : タグ（カンマ区切り。例: 本番,踏み台,鍵認証）
 #   note    : メモ（表示のみ）
 # ===================================================
 
@@ -21,7 +22,7 @@ groups:
         host: 192.168.1.10
         os: linux
         user: admin
-        op_item: "踏み台サーバー" # 1Passwordのアイテム名
+        op_item: "踏み台サーバー"  # 1Passwordのアイテム名
         note: "本番環境への踏み台"
 
       - name: "Zabbix監視サーバー"
