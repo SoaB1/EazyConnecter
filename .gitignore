@@ -16,6 +16,8 @@ __pycache__/
 
 # ユーザー固有の設定（各自で管理・ウィザードが生成）
 config/config.yaml
+/config.yaml
+/servers.yaml
 
 # エディタ・OS
 .vscode/
@@ -24,6 +26,13 @@ config/config.yaml
 Thumbs.db
 Desktop.ini
 
-# ビルド成果物・旧ファイル
-dist/
+# 旧ファイル
 .old/
+
+# フロントエンド（Node/React）
+frontend/node_modules/
+frontend/dist/
+
+# Claude
+CLAUDE.md
+HANDOFF.md
