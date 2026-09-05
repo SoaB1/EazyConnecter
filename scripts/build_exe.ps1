@@ -15,7 +15,7 @@ Write-Host "=== EazyConnecter exe ビルド ===" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "[0/5] アイコンを変換中..." -ForegroundColor Yellow
 
-if (-not (Test-Path "icon.ico")) {
+if (-not (Test-Path "img/icon.ico")) {
     if (Test-Path "img/icon.svg") {
         # Pillow で SVG→ICO 変換（cairosvg + Pillow）
         $convertScript = @"
@@ -56,30 +56,60 @@ else {
     Write-Host "  icon.ico は既に存在します（スキップ）" -ForegroundColor Green
 }
 
-# [1/4] PyInstaller 確認
+# [1/6] フロントエンド（React）をビルド
 Write-Host ""
-Write-Host "[1/4] PyInstaller を確認中..." -ForegroundColor Yellow
+Write-Host "[1/6] フロントエンドをビルド中..." -ForegroundColor Yellow
+Push-Location frontend
+npm ci
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[エラー] npm ci に失敗しました。" -ForegroundColor Red
+    Pop-Location
+    exit 1
+}
+npm run build
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[エラー] フロントエンドのビルドに失敗しました。" -ForegroundColor Red
+    Pop-Location
+    exit 1
+}
+Pop-Location
+Write-Host "  OK" -ForegroundColor Green
+
+# [2/6] Python依存パッケージ確認
+Write-Host ""
+Write-Host "[2/6] Python依存パッケージを確認中..." -ForegroundColor Yellow
 python -m PyInstaller --version 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "  インストール中..." -ForegroundColor Yellow
+    Write-Host "  PyInstaller をインストール中..." -ForegroundColor Yellow
     python -m pip install pyinstaller
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[エラー] PyInstaller のインストールに失敗しました。" -ForegroundColor Red
         exit 1
     }
 }
+python -c "import webview" 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  pywebview をインストール中..." -ForegroundColor Yellow
+    python -m pip install pywebview
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[エラー] pywebview のインストールに失敗しました。" -ForegroundColor Red
+        exit 1
+    }
+}
 Write-Host "  OK" -ForegroundColor Green
 
-# [2/4] EazyConnecter.exe ビルド
+# [3/6] EazyConnecter.exe ビルド
 Write-Host ""
-Write-Host "[2/4] EazyConnecter.exe をビルド中..." -ForegroundColor Yellow
+Write-Host "[3/6] EazyConnecter.exe をビルド中..." -ForegroundColor Yellow
 
 $args1 = @(
     "-m", "PyInstaller",
     "--onefile",
     "--windowed",
     "--name", "EazyConnecter",
+    "--paths", "src",
     "--add-data", "VERSION.md;.",
+    "--add-data", "frontend/dist;frontend_dist",
     "--icon", "img/icon.ico",
     "src/EazyConnecter.py"
 )
@@ -90,9 +120,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "  OK" -ForegroundColor Green
 
-# [3/4] EazyConnecter_Setup.exe ビルド
+# [4/6] EazyConnecter_Setup.exe ビルド
 Write-Host ""
-Write-Host "[3/4] EazyConnecter_Setup.exe をビルド中..." -ForegroundColor Yellow
+Write-Host "[4/6] EazyConnecter_Setup.exe をビルド中..." -ForegroundColor Yellow
 
 $args2 = @(
     "-m", "PyInstaller",
@@ -110,9 +140,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "  OK" -ForegroundColor Green
 
-# [4/5] 後処理
+# [5/6] 後処理
 Write-Host ""
-Write-Host "[4/5] 後処理中..." -ForegroundColor Yellow
+Write-Host "[5/6] 後処理中..." -ForegroundColor Yellow
 Copy-Item "config/servers.yaml" "dist\" -Force
 if (Test-Path "build") { Remove-Item "build"                    -Recurse -Force }
 if (Test-Path "EazyConnecter.spec") { Remove-Item "EazyConnecter.spec"       -Force }
@@ -121,9 +151,9 @@ if (Test-Path "EazyConnecter_Setup.spec") { Remove-Item "EazyConnecter_Setup.spe
 if (Test-Path "dist\config.yaml") { Remove-Item "dist\config.yaml"         -Force }
 Write-Host "  OK" -ForegroundColor Green
 
-# # [5/5] ZIP圧縮
+# [6/6] ZIP圧縮
 Write-Host ""
-Write-Host "[5/5] 配布用 ZIP を作成中..." -ForegroundColor Yellow
+Write-Host "[6/6] 配布用 ZIP を作成中..." -ForegroundColor Yellow
 
 # VERSION.md からバージョン番号を取得
 $version = "unknown"
@@ -137,14 +167,14 @@ Write-Host "  バージョン: $version" -ForegroundColor Gray
 
 $zipName = "EazyConnecter_v${version}.zip"
 $zipPath = Join-Path (Get-Location) $zipName
-$distPath = Join-Path (Get-Location) "dist"
+$root     = Get-Location
 
-# 配布対象ファイル（config.yaml は除外）
+# 配布対象ファイル（config.yaml は除外。src=実ファイルの場所、dst=ZIP内でのファイル名）
 $targets = @(
-    "EazyConnecter.exe",
-    "EazyConnecter_Setup.exe",
-    "config/servers.yaml",
-    "VERSION.md"
+    @{ src = "dist\EazyConnecter.exe";       dst = "EazyConnecter.exe"       },
+    @{ src = "dist\EazyConnecter_Setup.exe"; dst = "EazyConnecter_Setup.exe" },
+    @{ src = "dist\servers.yaml";            dst = "servers.yaml"            },
+    @{ src = "VERSION.md";                   dst = "VERSION.md"              }
 )
 
 # 既存ZIPを削除
@@ -153,15 +183,15 @@ if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 # System.IO.Compression で ZIP 作成（PowerShell 5以降標準）
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = [System.IO.Compression.ZipFile]::Open($zipPath, "Create")
-foreach ($fname in $targets) {
-    $fpath = Join-Path $distPath $fname
+foreach ($t in $targets) {
+    $fpath = Join-Path $root $t.src
     if (Test-Path $fpath) {
         [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
-            $zip, $fpath, $fname, "Optimal") | Out-Null
-        Write-Host "  + $fname" -ForegroundColor Gray
+            $zip, $fpath, $t.dst, "Optimal") | Out-Null
+        Write-Host "  + $($t.dst)" -ForegroundColor Gray
     }
     else {
-        Write-Host "  ! $fname が見つかりません（スキップ）" -ForegroundColor Yellow
+        Write-Host "  ! $($t.src) が見つかりません（スキップ）" -ForegroundColor Yellow
     }
 }
 $zip.Dispose()
@@ -172,12 +202,12 @@ Write-Host "=== ビルド完了 ===" -ForegroundColor Green
 Write-Host ""
 Write-Host "  配布用 ZIP : $zipName" -ForegroundColor Cyan
 Write-Host "  内容:"
-foreach ($fname in $targets) {
-    if ($fname -eq "EazyConnecter_Setup.exe") {
-        Write-Host "    $fname  ← 配布先で最初に実行" -ForegroundColor White
+foreach ($t in $targets) {
+    if ($t.dst -eq "EazyConnecter_Setup.exe") {
+        Write-Host "    $($t.dst)  ← 配布先で最初に実行" -ForegroundColor White
     }
     else {
-        Write-Host "    $fname"
+        Write-Host "    $($t.dst)"
     }
 }
 Write-Host ""
